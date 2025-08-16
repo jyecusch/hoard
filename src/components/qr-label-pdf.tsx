@@ -136,6 +136,7 @@ export async function generateQRCodes(count: number): Promise<string[]> {
       const qrCodeDataURL = await QRCode.toDataURL(qrCodeContent, {
         width: 200,
         margin: 1,
+        errorCorrectionLevel: "H", // High error correction to match modal
         color: {
           dark: "#000000",
           light: "#FFFFFF",

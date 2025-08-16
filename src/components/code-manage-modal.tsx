@@ -1,18 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Shuffle,
-  Save,
-  Download,
-  QrCode,
-  ScanLine,
-  Undo,
-} from "lucide-react";
+import { Shuffle, Save, Download, QrCode, ScanLine, Undo } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -23,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { QRScannerModal } from "@/components/qr-scanner-modal";
 import { nanoid } from "nanoid";
-import QRCode from "react-qr-code";
+import QRCode from "qrcode";
 import { DataMatrix } from "@/components/data-matrix";
 
 interface CodeManageModalProps {
@@ -47,9 +40,33 @@ export function CodeManageModal({
   const [inputValue, setInputValue] = useState(code || "");
   const [scannerOpen, setScannerOpen] = useState(false);
   const [codeType, setCodeType] = useState<"qr" | "datamatrix">("qr");
+  const [qrCodeDataURL, setQrCodeDataURL] = useState<string>("");
 
   // Show the input value if it's been modified, otherwise show stored code or container ID
   const displayCode = inputValue.trim() || code || containerId;
+
+  // Generate QR code data URL whenever displayCode changes
+  useEffect(() => {
+    const generateQRCode = async () => {
+      try {
+        const dataURL = await QRCode.toDataURL(displayCode, {
+          width: 200,
+          margin: 1,
+          errorCorrectionLevel: "H", // Match PDF generation settings
+          color: {
+            dark: "#000000",
+            light: "#FFFFFF",
+          },
+        });
+        setQrCodeDataURL(dataURL);
+      } catch (error) {
+        console.error("Error generating QR code:", error);
+        setQrCodeDataURL("");
+      }
+    };
+
+    generateQRCode();
+  }, [displayCode]);
 
   const handleSave = () => {
     const trimmedValue = inputValue.trim();
@@ -69,8 +86,14 @@ export function CodeManageModal({
   };
 
   const handleScanCode = (scannedCode: string) => {
-    setInputValue(scannedCode);
+    const trimmedCode = scannedCode.trim();
+    setInputValue(trimmedCode);
     setScannerOpen(false);
+
+    // Automatically save the scanned code
+    if (trimmedCode) {
+      onCodeUpdate?.(trimmedCode);
+    }
   };
 
   const handleOpenChange = (newOpen: boolean) => {
@@ -179,12 +202,20 @@ export function CodeManageModal({
                 <TabsContent value="qr" className="mt-4">
                   <div className="flex flex-col items-center space-y-2">
                     <div className="bg-white p-4 rounded-lg">
-                      <QRCode
-                        id="code-display-qr"
-                        value={displayCode}
-                        size={100}
-                        level="H"
-                      />
+                      {qrCodeDataURL ? (
+                        <img
+                          src={qrCodeDataURL}
+                          alt="QR Code"
+                          width={100}
+                          height={100}
+                        />
+                      ) : (
+                        <div className="w-[100px] h-[100px] bg-gray-200 rounded flex items-center justify-center">
+                          <span className="text-xs text-gray-500">
+                            Generating...
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </TabsContent>
@@ -238,7 +269,7 @@ export function CodeManageModal({
               <div className="grid grid-cols-3 gap-2">
                 <Button
                   onClick={handleSave}
-                  disabled={!inputValue.trim()}
+                  disabled={!inputValue.trim() || inputValue === code}
                   className="gap-2"
                   size="sm"
                 >
