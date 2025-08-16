@@ -18,7 +18,7 @@ export default function LabelsPage() {
     
     try {
       // Generate codes (QR or DataMatrix)
-      const codes = await generateCodes(config.numLabels, config.codeType);
+      const codes = await generateCodes(config.numLabels, config.codeType, config.skipLabelNumbers);
       
       // Create PDF document
       const pdfDoc = <LabelPDF config={config} codes={codes} />;

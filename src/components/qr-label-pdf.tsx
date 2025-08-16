@@ -18,6 +18,10 @@ export function LabelPDF({ config, codes }: LabelPDFProps) {
   const paperSizes = {
     A4: { width: mmToPoints(210), height: mmToPoints(297) },
     US_LETTER: { width: mmToPoints(216), height: mmToPoints(279) },
+    A5: { width: mmToPoints(148), height: mmToPoints(210) },
+    US_LEGAL: { width: mmToPoints(216), height: mmToPoints(356) },
+    A3: { width: mmToPoints(297), height: mmToPoints(420) },
+    TABLOID: { width: mmToPoints(279), height: mmToPoints(432) },
   };
 
   const paper = paperSizes[config.paperSize];
@@ -126,10 +130,22 @@ export function LabelPDF({ config, codes }: LabelPDFProps) {
 }
 
 // Utility function to generate codes (QR or DataMatrix)
-export async function generateCodes(count: number, codeType: "qr" | "datamatrix" = "qr"): Promise<string[]> {
+export async function generateCodes(
+  count: number, 
+  codeType: "qr" | "datamatrix" = "qr",
+  skipNumbers: number[] = []
+): Promise<string[]> {
   const codes: string[] = [];
 
   for (let i = 0; i < count; i++) {
+    const labelNumber = i + 1;
+    
+    // Check if this label should be skipped
+    if (skipNumbers.includes(labelNumber)) {
+      codes.push(""); // Empty string for skipped labels
+      continue;
+    }
+    
     // Generate a simple nanoid for each code
     const codeContent = nanoid(8); // 8 character nanoid
 
