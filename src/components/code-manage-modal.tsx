@@ -17,7 +17,7 @@ import {
 import { QRScannerModal } from "@/components/qr-scanner-modal";
 import { nanoid } from "nanoid";
 import QRCode from "qrcode";
-import { DataMatrix } from "@/components/data-matrix";
+import { generateDataMatrixDataURL } from "@/components/data-matrix";
 
 interface CodeManageModalProps {
   code?: string | null;
@@ -41,15 +41,17 @@ export function CodeManageModal({
   const [scannerOpen, setScannerOpen] = useState(false);
   const [codeType, setCodeType] = useState<"qr" | "datamatrix">("qr");
   const [qrCodeDataURL, setQrCodeDataURL] = useState<string>("");
+  const [dataMatrixDataURL, setDataMatrixDataURL] = useState<string>("");
 
   // Show the input value if it's been modified, otherwise show stored code or container ID
   const displayCode = inputValue.trim() || code || containerId;
 
-  // Generate QR code data URL whenever displayCode changes
+  // Generate both QR code and DataMatrix data URLs whenever displayCode changes
   useEffect(() => {
-    const generateQRCode = async () => {
+    const generateCodes = async () => {
       try {
-        const dataURL = await QRCode.toDataURL(displayCode, {
+        // Generate QR code
+        const qrDataURL = await QRCode.toDataURL(displayCode, {
           width: 200,
           margin: 1,
           errorCorrectionLevel: "H", // Match PDF generation settings
@@ -58,14 +60,19 @@ export function CodeManageModal({
             light: "#FFFFFF",
           },
         });
-        setQrCodeDataURL(dataURL);
+        setQrCodeDataURL(qrDataURL);
+
+        // Generate DataMatrix
+        const dmDataURL = await generateDataMatrixDataURL(displayCode, 200);
+        setDataMatrixDataURL(dmDataURL);
       } catch (error) {
-        console.error("Error generating QR code:", error);
+        console.error("Error generating codes:", error);
         setQrCodeDataURL("");
+        setDataMatrixDataURL("");
       }
     };
 
-    generateQRCode();
+    generateCodes();
   }, [displayCode]);
 
   const handleSave = () => {
@@ -104,14 +111,26 @@ export function CodeManageModal({
   };
 
   const handleDownload = () => {
-    const codeElement = document.getElementById(`code-display-${codeType}`);
-    if (!codeElement) return;
+    const codeElement = document.getElementById(`code-display-${codeType}`) as HTMLImageElement;
+    if (!codeElement || !codeElement.src) return;
 
     const filename = `${codeType}-${containerName.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.png`;
 
-    if (codeType === "datamatrix") {
-      // For DataMatrix (canvas), download directly
-      const canvas = codeElement as HTMLCanvasElement;
+    // For both QR and DataMatrix (both are now img elements with data URLs)
+    // Convert the data URL to a blob and download
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
+
+    img.onload = () => {
+      // Set canvas size to match image
+      canvas.width = img.naturalWidth || 200;
+      canvas.height = img.naturalHeight || 200;
+      
+      // Draw image on canvas
+      ctx?.drawImage(img, 0, 0);
+      
+      // Convert to blob and download
       canvas.toBlob((blob) => {
         if (blob) {
           const url = URL.createObjectURL(blob);
@@ -123,36 +142,10 @@ export function CodeManageModal({
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
         }
-      });
-    } else {
-      // For QR code (SVG), convert to canvas first
-      const svgData = new XMLSerializer().serializeToString(codeElement);
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      const img = new Image();
+      }, 'image/png');
+    };
 
-      img.onload = () => {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx?.drawImage(img, 0, 0);
-        canvas.toBlob((blob) => {
-          if (blob) {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-          }
-        });
-      };
-
-      img.src =
-        "data:image/svg+xml;base64," +
-        btoa(unescape(encodeURIComponent(svgData)));
-    }
+    img.src = codeElement.src;
   };
 
   if (!editable && !code) {
@@ -204,6 +197,7 @@ export function CodeManageModal({
                     <div className="bg-white p-4 rounded-lg">
                       {qrCodeDataURL ? (
                         <img
+                          id="code-display-qr"
                           src={qrCodeDataURL}
                           alt="QR Code"
                           width={100}
@@ -223,11 +217,20 @@ export function CodeManageModal({
                 <TabsContent value="datamatrix" className="mt-4">
                   <div className="flex flex-col items-center space-y-2">
                     <div className="bg-white p-4 rounded-lg">
-                      <DataMatrix
-                        id="code-display-datamatrix"
-                        value={displayCode}
-                        size={100}
-                      />
+                      {dataMatrixDataURL ? (
+                        <img 
+                          id="code-display-datamatrix"
+                          src={dataMatrixDataURL} 
+                          alt="Data Matrix Code" 
+                          width={100}
+                          height={100}
+                          style={{ imageRendering: 'pixelated' }}
+                        />
+                      ) : (
+                        <div className="w-[100px] h-[100px] bg-gray-200 rounded flex items-center justify-center">
+                          <span className="text-xs text-gray-500">Generating...</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </TabsContent>

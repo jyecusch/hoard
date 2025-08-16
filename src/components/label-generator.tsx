@@ -34,6 +34,7 @@ export interface LabelConfig {
   gapVertical: number;
   numPages: number;
   numLabels: number;
+  codeType: "qr" | "datamatrix";
 }
 
 interface LabelGeneratorProps {
@@ -57,6 +58,7 @@ export function LabelGenerator({
     gapVertical: 5,
     numPages: 1,
     numLabels: 24,
+    codeType: "qr",
   });
 
   const [previewScale, setPreviewScale] = useState(0.3);
@@ -136,6 +138,21 @@ export function LabelGenerator({
                     updateConfig("numPages", parseInt(e.target.value) || 1)
                   }
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="codeType">Code Type</Label>
+                <Select
+                  value={config.codeType}
+                  onValueChange={(value) => updateConfig("codeType", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="qr">QR Code</SelectItem>
+                    <SelectItem value="datamatrix">Data Matrix</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { pdf } from '@react-pdf/renderer';
 import { LayoutWrapper } from "@/components/layout-wrapper";
 import { LabelGenerator, LabelConfig } from "@/components/label-generator";
-import { QRLabelPDF, generateQRCodes } from "@/components/qr-label-pdf";
+import { LabelPDF, generateCodes } from "@/components/qr-label-pdf";
 import { useAuth } from "@/components/auth-provider";
 
 export default function LabelsPage() {
@@ -17,11 +17,11 @@ export default function LabelsPage() {
     setIsGenerating(true);
     
     try {
-      // Generate QR codes
-      const qrCodes = await generateQRCodes(config.numLabels);
+      // Generate codes (QR or DataMatrix)
+      const codes = await generateCodes(config.numLabels, config.codeType);
       
       // Create PDF document
-      const pdfDoc = <QRLabelPDF config={config} qrCodes={qrCodes} />;
+      const pdfDoc = <LabelPDF config={config} codes={codes} />;
       
       // Generate PDF blob
       const pdfBlob = await pdf(pdfDoc).toBlob();
@@ -30,7 +30,7 @@ export default function LabelsPage() {
       const url = URL.createObjectURL(pdfBlob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `qr-labels-${new Date().toISOString().split('T')[0]}.pdf`;
+      link.download = `${config.codeType}-labels-${new Date().toISOString().split('T')[0]}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -61,9 +61,9 @@ export default function LabelsPage() {
     <LayoutWrapper>
       <div className="p-6 max-w-4xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold">QR Code Labels</h1>
+          <h1 className="text-3xl font-bold">Barcode Labels</h1>
           <p className="text-muted-foreground mt-2">
-            Generate printable QR code labels for your inventory system. 
+            Generate printable QR code or Data Matrix labels for your inventory system. 
             Perfect for pre-printing labels before cataloging items around your home.
           </p>
         </div>

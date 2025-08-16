@@ -3,17 +3,18 @@
 import { Document, Page, View, Image, StyleSheet } from "@react-pdf/renderer";
 import QRCode from "qrcode";
 import { nanoid } from "nanoid";
+import { generateDataMatrixDataURL } from "./data-matrix";
 import { LabelConfig } from "./label-generator";
 
-interface QRLabelPDFProps {
+interface LabelPDFProps {
   config: LabelConfig;
-  qrCodes: string[];
+  codes: string[];
 }
 
 // Convert mm to points (PDF unit)
 const mmToPoints = (mm: number) => mm * 2.834645669;
 
-export function QRLabelPDF({ config, qrCodes }: QRLabelPDFProps) {
+export function LabelPDF({ config, codes }: LabelPDFProps) {
   const paperSizes = {
     A4: { width: mmToPoints(210), height: mmToPoints(297) },
     US_LETTER: { width: mmToPoints(216), height: mmToPoints(279) },
@@ -73,14 +74,14 @@ export function QRLabelPDF({ config, qrCodes }: QRLabelPDFProps) {
   const pages = [];
 
   for (let pageIndex = 0; pageIndex < config.numPages; pageIndex++) {
-    const pageQRCodes = qrCodes.slice(
+    const pageCodes = codes.slice(
       pageIndex * labelsPerPage,
       (pageIndex + 1) * labelsPerPage
     );
 
     const rows = [];
     for (let rowIndex = 0; rowIndex < config.labelsY; rowIndex++) {
-      const rowQRCodes = pageQRCodes.slice(
+      const rowCodes = pageCodes.slice(
         rowIndex * config.labelsX,
         (rowIndex + 1) * config.labelsX
       );
@@ -91,7 +92,7 @@ export function QRLabelPDF({ config, qrCodes }: QRLabelPDFProps) {
           style={rowIndex === config.labelsY - 1 ? styles.lastRow : styles.row}
         >
           {Array.from({ length: config.labelsX }, (_, colIndex) => {
-            const qrCode = rowQRCodes[colIndex];
+            const code = rowCodes[colIndex];
 
             return (
               <View
@@ -102,7 +103,7 @@ export function QRLabelPDF({ config, qrCodes }: QRLabelPDFProps) {
                     : styles.label
                 }
               >
-                {qrCode && <Image src={qrCode} style={styles.qrCode} />}
+                {code && <Image src={code} style={styles.qrCode} />}
               </View>
             );
           })}
@@ -124,31 +125,38 @@ export function QRLabelPDF({ config, qrCodes }: QRLabelPDFProps) {
   return <Document>{pages}</Document>;
 }
 
-// Utility function to generate QR codes
-export async function generateQRCodes(count: number): Promise<string[]> {
-  const qrCodes: string[] = [];
+// Utility function to generate codes (QR or DataMatrix)
+export async function generateCodes(count: number, codeType: "qr" | "datamatrix" = "qr"): Promise<string[]> {
+  const codes: string[] = [];
 
   for (let i = 0; i < count; i++) {
-    // Generate a simple nanoid for each QR code
-    const qrCodeContent = nanoid(8); // 8 character nanoid
+    // Generate a simple nanoid for each code
+    const codeContent = nanoid(8); // 8 character nanoid
 
     try {
-      const qrCodeDataURL = await QRCode.toDataURL(qrCodeContent, {
-        width: 200,
-        margin: 1,
-        errorCorrectionLevel: "H", // High error correction to match modal
-        color: {
-          dark: "#000000",
-          light: "#FFFFFF",
-        },
-      });
-      qrCodes.push(qrCodeDataURL);
+      let codeDataURL: string;
+      
+      if (codeType === "datamatrix") {
+        codeDataURL = await generateDataMatrixDataURL(codeContent, 200);
+      } else {
+        codeDataURL = await QRCode.toDataURL(codeContent, {
+          width: 200,
+          margin: 1,
+          errorCorrectionLevel: "H", // High error correction to match modal
+          color: {
+            dark: "#000000",
+            light: "#FFFFFF",
+          },
+        });
+      }
+      
+      codes.push(codeDataURL);
     } catch (error) {
-      console.error("Error generating QR code:", error);
+      console.error(`Error generating ${codeType} code:`, error);
       // Push empty string as fallback
-      qrCodes.push("");
+      codes.push("");
     }
   }
 
-  return qrCodes;
+  return codes;
 }
