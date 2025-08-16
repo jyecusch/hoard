@@ -50,8 +50,26 @@ export function ZeroDataProvider({ children }: ZeroDataProviderProps) {
     }
   }, [user?.id]);
 
-  // Zero configuration
-  const server = process.env.NEXT_PUBLIC_ZERO_SERVER || "http://localhost:4848";
+  // Zero configuration - dynamically construct based on current location
+  const getZeroServer = () => {
+    // If we have an explicit server URL from env, use it
+    if (process.env.NEXT_PUBLIC_ZERO_SERVER) {
+      return process.env.NEXT_PUBLIC_ZERO_SERVER;
+    }
+    
+    // In browser, construct URL based on current location
+    if (typeof window !== 'undefined') {
+      // Zero expects HTTP/HTTPS URL, not WebSocket - it handles the upgrade internally
+      const protocol = window.location.protocol; // 'http:' or 'https:'
+      const host = window.location.host;
+      return `${protocol}//${host}/zero`;
+    }
+    
+    // Fallback for SSR
+    return "http://localhost:4848";
+  };
+
+  const server = getZeroServer();
   const userID = user?.id || "anonymous";
 
   return (

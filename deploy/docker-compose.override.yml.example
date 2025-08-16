@@ -1,0 +1,57 @@
+# Example docker-compose.override.yml
+# Copy this file to docker-compose.override.yml and customize as needed
+# These settings will override the main docker-compose.yml without modifying it
+
+version: '3.8'
+
+services:
+  # Example: Expose PostgreSQL for debugging (not recommended for production)
+  # postgres:
+  #   ports:
+  #     - "5432:5432"
+
+  # Example: Add custom environment variables to app
+  # app:
+  #   environment:
+  #     - CUSTOM_VAR=value
+  #     - DEBUG=true
+
+  # Example: Mount local code for development
+  # app:
+  #   volumes:
+  #     - ../src:/app/src:ro
+  #     - ../public:/app/public:ro
+
+  # Example: Increase resource limits
+  # app:
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: '2'
+  #         memory: 2G
+  #       reservations:
+  #         cpus: '1'
+  #         memory: 1G
+
+  # Example: Custom logging configuration
+  # app:
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "3"
+
+  # Example: Add health check to app service
+  # app:
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+
+  # Example: Custom Caddy configuration
+  # caddy:
+  #   environment:
+  #     - CADDY_AGREE=true  # Automatically agree to Let's Encrypt terms
+  #   volumes:
+  #     - ./custom-caddy-config:/etc/caddy/custom:ro

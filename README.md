@@ -28,7 +28,14 @@ A modern web application for organizing and tracking your physical items using a
 - PostgreSQL database
 - Zero cache server (for real-time sync)
 
-## Installation
+## Deployment
+
+For production deployment with HTTPS/WSS support using Docker Compose, see the [**Deployment Guide**](./deploy/README.md). We provide multiple HTTPS options:
+- **Caddy with Let's Encrypt** - Automatic SSL for domains with open ports
+- **Cloudflare Tunnel** - No open ports required, works behind firewalls
+- **Local HTTPS** - Self-signed certificates for testing
+
+## Development Setup
 
 1. Clone the repository:
 ```bash

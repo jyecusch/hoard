@@ -1,0 +1,156 @@
+services:
+  # Base Services (Always Run)
+  postgres:
+    image: postgres:16-alpine
+    container_name: hoard-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hoard}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    command:
+      - postgres
+      - -c
+      - wal_level=logical  # Required for Zero sync
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hoard_network
+
+  # Database migration service - runs once then exits
+  migrate:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: hoard-app:local
+    container_name: hoard-migrate
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-hoard}?sslmode=disable
+      NODE_ENV: production
+    command: ["node", "/app/deploy/migrate.js"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - hoard_network
+    restart: "no"
+    volumes:
+      - ./migrate.js:/app/deploy/migrate.js:ro
+
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: hoard-app:local
+    container_name: hoard-app
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-hoard}?sslmode=disable
+      NODE_ENV: production
+      BETTER_AUTH_URL: ${APP_URL:-https://localhost}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      NEXTAUTH_URL: ${APP_URL:-https://localhost}
+      ZERO_AUTH_SECRET: ${ZERO_AUTH_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - hoard_network
+    volumes:
+      - ../uploads:/app/uploads
+
+  zero:
+    image: rocicorp/zero:latest
+    container_name: hoard-zero
+    environment:
+      ZERO_UPSTREAM_DB: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-hoard}?sslmode=disable
+      ZERO_CVR_DB: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-hoard}_cvr?sslmode=disable
+      ZERO_CHANGE_DB: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-hoard}_cdb?sslmode=disable
+      ZERO_REPLICA_FILE: /tmp/zero-replica.db
+      ZERO_REPLICA_FILE_TMP_DIR: /tmp
+      ZERO_AUTH_SECRET: ${ZERO_AUTH_SECRET}
+      ZERO_LOG_LEVEL: info
+      PORT: 8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - hoard_network
+    volumes:
+      - zero_data:/tmp
+
+  # Profile: Caddy with Let's Encrypt (Requires open ports 80/443)
+  caddy:
+    image: caddy:2-alpine
+    container_name: hoard-caddy
+    profiles:
+      - caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile.production:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      DOMAIN: ${DOMAIN}
+    depends_on:
+      - app
+      - zero
+    restart: unless-stopped
+    networks:
+      - hoard_network
+
+  # Profile: Cloudflare Tunnel (No open ports required)
+  cloudflare:
+    image: cloudflare/cloudflared:latest
+    container_name: hoard-cloudflare
+    profiles:
+      - cloudflare
+    command: tunnel run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    depends_on:
+      - app
+      - zero
+    restart: unless-stopped
+    networks:
+      - hoard_network
+
+  # Profile: Local HTTPS (Development/Testing)
+  caddy-local:
+    image: caddy:2-alpine
+    container_name: hoard-caddy-local
+    profiles:
+      - local
+    ports:
+      - "443:443"
+    volumes:
+      - ./Caddyfile.local:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+      - zero
+    restart: unless-stopped
+    networks:
+      - hoard_network
+
+networks:
+  hoard_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
+  zero_data:

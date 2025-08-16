@@ -1,9 +1,7 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: hoard-postgres
+    container_name: hoard-pg-dev
     environment:
       POSTGRES_DB: hoard
       POSTGRES_USER: postgres

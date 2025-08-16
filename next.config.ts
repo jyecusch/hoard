@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  // Enable standalone output for Docker deployments
+  output: 'standalone',
+  
   // For WebSocket connections
   webpack: (config) => {
     config.resolve.fallback = { ...config.resolve.fallback, net: false };
