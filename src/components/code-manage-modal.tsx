@@ -48,7 +48,8 @@ export function CodeManageModal({
   const [scannerOpen, setScannerOpen] = useState(false);
   const [codeType, setCodeType] = useState<"qr" | "datamatrix">("qr");
 
-  const displayCode = code || containerId; // Show custom code or fall back to container ID
+  // Show the input value if it's been modified, otherwise show stored code or container ID
+  const displayCode = inputValue.trim() || code || containerId;
 
   const handleSave = () => {
     const trimmedValue = inputValue.trim();

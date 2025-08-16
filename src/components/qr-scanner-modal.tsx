@@ -50,11 +50,11 @@ export function QRScannerModal({
           setError('Invalid QR code format');
         }
       } catch {
-        // If it's not a URL, try to treat it as a direct container ID or look up by code
+        // If it's not a URL, treat it as a code and use the code lookup route
         if (result && result.length > 0) {
           onOpenChange(false);
-          // Try to navigate - the backend can handle looking up by code
-          router.push(`/i/${result}`);
+          // Use code lookup route to find and redirect to the correct item
+          router.push(`/code/${encodeURIComponent(result)}`);
         } else {
           setError('Invalid QR code');
         }
