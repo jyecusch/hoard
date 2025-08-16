@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Edit2, Check, X } from "lucide-react";
+import { useZeroMutate } from "@/hooks/use-zero";
+import { mutators } from "@/zero/mutators";
 
 interface EditableNameProps {
   containerId: string;
@@ -11,10 +13,11 @@ interface EditableNameProps {
   onUpdate?: (name: string) => void;
 }
 
-export function EditableName({ initialName = "", onUpdate }: EditableNameProps) {
+export function EditableName({ containerId, initialName = "", onUpdate }: EditableNameProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(initialName);
   const [tempName, setTempName] = useState(initialName);
+  const z = useZeroMutate();
 
   useEffect(() => {
     setName(initialName);
@@ -25,7 +28,10 @@ export function EditableName({ initialName = "", onUpdate }: EditableNameProps) 
     if (!tempName.trim()) return;
     
     try {
-      // TODO: Implement name update API call
+      await mutators.updateContainer(z, {
+        id: containerId,
+        name: tempName.trim()
+      });
       
       setName(tempName);
       onUpdate?.(tempName);

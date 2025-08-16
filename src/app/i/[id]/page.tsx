@@ -247,6 +247,14 @@ export default function ContainerRoute() {
     }
   };
 
+  const handleDescriptionUpdate = async (description: string) => {
+    try {
+      await mutators.updateContainer(z, { id: containerId, description });
+    } catch (error) {
+      console.error("Failed to update description:", error);
+    }
+  };
+
   const content = loading ? (
     <div className="flex items-center justify-center py-12">
       <div className="text-center">
@@ -288,7 +296,11 @@ export default function ContainerRoute() {
         />
 
         <div className="flex flex-col gap-4">
-          <DescriptionCard description={containerWithExtras.description} />
+          <DescriptionCard 
+            containerId={containerId}
+            description={containerWithExtras.description} 
+            onUpdate={handleDescriptionUpdate}
+          />
 
           {/* Contents Section - only show for containers */}
           {!containerWithExtras.isItem && (
