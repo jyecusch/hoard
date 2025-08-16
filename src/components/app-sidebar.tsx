@@ -15,7 +15,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { Package, Home, Star, LogOut, User, FolderOpen, Heart } from "lucide-react";
+import { Package, Home, Star, LogOut, User, FolderOpen, Heart, QrCode } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -51,6 +51,14 @@ export function AppSidebar() {
                   <Link href="/">
                     <Home className="h-4 w-4" />
                     <span>My Hoards</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <Link href="/labels">
+                    <QrCode className="h-4 w-4" />
+                    <span>QR Labels</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
