@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   Card,
   CardContent,
@@ -58,6 +59,7 @@ export interface LabelConfig {
   inputMode: "pages" | "labels";
   skipLabels: string;
   skipLabelNumbers: number[];
+  includeText: boolean;
 }
 
 interface LabelGeneratorProps {
@@ -135,6 +137,7 @@ export function LabelGenerator({
     inputMode: "pages",
     skipLabels: "",
     skipLabelNumbers: [],
+    includeText: false,
   });
 
   const [previewScale, setPreviewScale] = useState(0.3);
@@ -183,7 +186,7 @@ export function LabelGenerator({
 
   const updateConfig = (
     key: keyof LabelConfig,
-    value: string | number | number[]
+    value: string | number | number[] | boolean
   ) => {
     const newConfig = { ...config, [key]: value };
 
@@ -327,7 +330,7 @@ export function LabelGenerator({
                 <Settings className="h-4 w-4" />
                 Quick Setup
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Label htmlFor="paperSize">Paper Size</Label>
@@ -440,6 +443,26 @@ export function LabelGenerator({
                       <SelectItem value="datamatrix">Data Matrix</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="includeText">Include Code Text</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3 w-3 text-muted-foreground" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Print the code value below each barcode</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <div className="flex items-center h-10">
+                    <Switch
+                      id="includeText"
+                      checked={config.includeText}
+                      onCheckedChange={(checked) => updateConfig("includeText", checked)}
+                    />
+                  </div>
                 </div>
               </div>
             </div>

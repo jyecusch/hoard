@@ -1,14 +1,19 @@
 "use client";
 
-import { Document, Page, View, Image, StyleSheet } from "@react-pdf/renderer";
+import { Document, Page, View, Image, Text, StyleSheet } from "@react-pdf/renderer";
 import QRCode from "qrcode";
 import { nanoid } from "nanoid";
 import { generateDataMatrixDataURL } from "./data-matrix";
 import { LabelConfig } from "./label-generator";
 
+interface CodeData {
+  dataUrl: string;
+  text: string;
+}
+
 interface LabelPDFProps {
   config: LabelConfig;
-  codes: string[];
+  codes: CodeData[];
 }
 
 // Convert mm to points (PDF unit)
@@ -72,6 +77,12 @@ export function LabelPDF({ config, codes }: LabelPDFProps) {
       width: Math.min(labelWidth * 0.8, labelHeight * 0.8),
       height: Math.min(labelWidth * 0.8, labelHeight * 0.8),
     },
+    codeText: {
+      fontSize: Math.min(labelWidth * 0.08, labelHeight * 0.08, 8),
+      textAlign: "center" as const,
+      marginTop: 2,
+      fontFamily: "Courier",
+    },
   });
 
   const labelsPerPage = config.labelsX * config.labelsY;
@@ -107,7 +118,14 @@ export function LabelPDF({ config, codes }: LabelPDFProps) {
                     : styles.label
                 }
               >
-                {code && <Image src={code} style={styles.qrCode} />}
+                {code && (
+                  <View style={{ alignItems: "center" }}>
+                    <Image src={code.dataUrl} style={styles.qrCode} />
+                    {config.includeText && (
+                      <Text style={styles.codeText}>{code.text}</Text>
+                    )}
+                  </View>
+                )}
               </View>
             );
           })}
@@ -134,15 +152,15 @@ export async function generateCodes(
   count: number, 
   codeType: "qr" | "datamatrix" = "qr",
   skipNumbers: number[] = []
-): Promise<string[]> {
-  const codes: string[] = [];
+): Promise<CodeData[]> {
+  const codes: CodeData[] = [];
 
   for (let i = 0; i < count; i++) {
     const labelNumber = i + 1;
     
     // Check if this label should be skipped
     if (skipNumbers.includes(labelNumber)) {
-      codes.push(""); // Empty string for skipped labels
+      codes.push({ dataUrl: "", text: "" }); // Empty for skipped labels
       continue;
     }
     
@@ -166,11 +184,11 @@ export async function generateCodes(
         });
       }
       
-      codes.push(codeDataURL);
+      codes.push({ dataUrl: codeDataURL, text: codeContent });
     } catch (error) {
       console.error(`Error generating ${codeType} code:`, error);
-      // Push empty string as fallback
-      codes.push("");
+      // Push empty as fallback
+      codes.push({ dataUrl: "", text: "" });
     }
   }
 
