@@ -168,13 +168,26 @@ export function LabelPreview({ config, scale = 0.3, onSkipToggle }: LabelPreview
                     }}
                   />
                 ) : label.width > 15 && label.height > 15 ? (
-                  <QrCode
-                    className="text-gray-400 pointer-events-none"
-                    style={{
-                      width: `${Math.min(label.width * 0.6, label.height * 0.6)}px`,
-                      height: `${Math.min(label.width * 0.6, label.height * 0.6)}px`,
-                    }}
-                  />
+                  <div className="flex flex-col items-center pointer-events-none">
+                    <QrCode
+                      className="text-gray-400"
+                      style={{
+                        width: `${Math.min(label.width * (config.includeText ? 0.5 : 0.6), label.height * (config.includeText ? 0.5 : 0.6))}px`,
+                        height: `${Math.min(label.width * (config.includeText ? 0.5 : 0.6), label.height * (config.includeText ? 0.5 : 0.6))}px`,
+                      }}
+                    />
+                    {config.includeText && (
+                      <div 
+                        className="text-gray-500 font-mono text-center mt-1"
+                        style={{
+                          fontSize: `${Math.min(label.width * 0.06, label.height * 0.06, 8)}px`,
+                          lineHeight: '1',
+                        }}
+                      >
+                        ABC123XY
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <div className="text-xs text-red-500 text-center p-1 pointer-events-none">
                     Too small
