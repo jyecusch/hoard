@@ -19,7 +19,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Tooltip,
   TooltipContent,
@@ -38,13 +37,18 @@ import {
   Eye,
   Info,
   ChevronDown,
-  Package2,
   Ruler,
+  Square,
+  Circle,
+  Move,
+  RectangleHorizontal,
 } from "lucide-react";
 import { LabelPreview } from "./label-preview";
+import { IconButtonGroup, IconButtonGroupItem } from "@/components/ui/icon-button-group";
+import { PAPER_SIZES } from "./paper-sizes";
 
 export interface LabelConfig {
-  paperSize: "A4" | "US_LETTER" | "A5" | "US_LEGAL" | "A3" | "TABLOID";
+  paperSize: keyof typeof PAPER_SIZES;
   labelsX: number;
   labelsY: number;
   marginTop: number;
@@ -62,6 +66,9 @@ export interface LabelConfig {
   includeText: boolean;
   labelShape: "rectangular" | "circular";
   labelPadding: number;
+  layoutMode: "gaps" | "dimensions";
+  labelWidth: number;
+  labelHeight: number;
 }
 
 interface LabelGeneratorProps {
@@ -142,9 +149,13 @@ export function LabelGenerator({
     includeText: false,
     labelShape: "rectangular",
     labelPadding: 2,
+    layoutMode: "gaps",
+    labelWidth: 65,
+    labelHeight: 35,
   });
 
   const [previewScale, setPreviewScale] = useState(0.3);
+
 
   const parseSkipLabels = (input: string): number[] => {
     if (!input.trim()) return [];
@@ -188,11 +199,78 @@ export function LabelGenerator({
     return Array.from(numbers).sort((a, b) => a - b);
   };
 
+  // Helper function to calculate gaps from label dimensions
+  const calculateGapsFromDimensions = (config: LabelConfig) => {
+    const paper = PAPER_SIZES[config.paperSize];
+    const availableWidth = paper.width - config.marginLeft - config.marginRight;
+    const availableHeight = paper.height - config.marginTop - config.marginBottom;
+    
+    // Calculate gaps: (available space - total label space) / (number of gaps)
+    const totalLabelWidth = config.labelWidth * config.labelsX;
+    const totalLabelHeight = config.labelHeight * config.labelsY;
+    
+    const gapHorizontal = config.labelsX > 1 ? 
+      Math.max(0, (availableWidth - totalLabelWidth) / (config.labelsX - 1)) : 0;
+    const gapVertical = config.labelsY > 1 ? 
+      Math.max(0, (availableHeight - totalLabelHeight) / (config.labelsY - 1)) : 0;
+    
+    return { gapHorizontal, gapVertical };
+  };
+
+  // Helper function to calculate label dimensions from gaps
+  const calculateDimensionsFromGaps = (config: LabelConfig) => {
+    const paper = PAPER_SIZES[config.paperSize];
+    const availableWidth = paper.width - config.marginLeft - config.marginRight;
+    const availableHeight = paper.height - config.marginTop - config.marginBottom;
+    
+    const labelWidth = (availableWidth - (config.labelsX - 1) * config.gapHorizontal) / config.labelsX;
+    const labelHeight = (availableHeight - (config.labelsY - 1) * config.gapVertical) / config.labelsY;
+    
+    return { labelWidth: Math.max(1, labelWidth), labelHeight: Math.max(1, labelHeight) };
+  };
+
   const updateConfig = (
     key: keyof LabelConfig,
     value: string | number | number[] | boolean
   ) => {
     const newConfig = { ...config, [key]: value };
+
+    // Handle layout mode changes
+    if (key === "layoutMode") {
+      if (value === "dimensions") {
+        // Convert current gaps to dimensions
+        const { labelWidth, labelHeight } = calculateDimensionsFromGaps(newConfig);
+        newConfig.labelWidth = Math.round(labelWidth * 10) / 10; // Round to 1 decimal
+        newConfig.labelHeight = Math.round(labelHeight * 10) / 10;
+      } else {
+        // Convert current dimensions to gaps
+        const { gapHorizontal, gapVertical } = calculateGapsFromDimensions(newConfig);
+        newConfig.gapHorizontal = Math.round(gapHorizontal * 10) / 10;
+        newConfig.gapVertical = Math.round(gapVertical * 10) / 10;
+      }
+    }
+
+    // Auto-calculate gaps when in dimensions mode
+    if (newConfig.layoutMode === "dimensions") {
+      if (key === "labelWidth" || key === "labelHeight" || key === "labelsX" || key === "labelsY" || 
+          key === "marginTop" || key === "marginRight" || key === "marginBottom" || key === "marginLeft" || 
+          key === "paperSize") {
+        const { gapHorizontal, gapVertical } = calculateGapsFromDimensions(newConfig);
+        newConfig.gapHorizontal = Math.round(gapHorizontal * 10) / 10;
+        newConfig.gapVertical = Math.round(gapVertical * 10) / 10;
+      }
+    }
+
+    // Auto-calculate dimensions when in gaps mode
+    if (newConfig.layoutMode === "gaps") {
+      if (key === "gapHorizontal" || key === "gapVertical" || key === "labelsX" || key === "labelsY" || 
+          key === "marginTop" || key === "marginRight" || key === "marginBottom" || key === "marginLeft" || 
+          key === "paperSize") {
+        const { labelWidth, labelHeight } = calculateDimensionsFromGaps(newConfig);
+        newConfig.labelWidth = Math.round(labelWidth * 10) / 10;
+        newConfig.labelHeight = Math.round(labelHeight * 10) / 10;
+      }
+    }
 
     // Handle input mode changes
     if (key === "inputMode") {
@@ -293,16 +371,7 @@ export function LabelGenerator({
     });
   };
 
-  const paperSizes = {
-    A4: { width: 210, height: 297, unit: "mm" },
-    US_LETTER: { width: 216, height: 279, unit: "mm" },
-    A5: { width: 148, height: 210, unit: "mm" },
-    US_LEGAL: { width: 216, height: 356, unit: "mm" },
-    A3: { width: 297, height: 420, unit: "mm" },
-    TABLOID: { width: 279, height: 432, unit: "mm" },
-  };
-
-  const currentPaper = paperSizes[config.paperSize];
+  const currentPaper = PAPER_SIZES[config.paperSize];
   const availableWidth =
     currentPaper.width - config.marginLeft - config.marginRight;
   const availableHeight =
@@ -626,106 +695,215 @@ export function LabelGenerator({
                 {/* Layout Settings */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium">Layout Grid</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <Label htmlFor="labelsX">Columns</Label>
+                        <Label htmlFor="labelsX">Grid Size</Label>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Info className="h-3 w-3 text-muted-foreground" />
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Number of label columns per page</p>
+                            <p>Number of columns and rows per page</p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
-                      <Input
-                        id="labelsX"
-                        type="number"
-                        min="1"
-                        max="10"
-                        value={config.labelsX}
-                        onChange={(e) =>
-                          updateConfig("labelsX", parseInt(e.target.value) || 1)
-                        }
-                      />
+                      <div className="flex gap-2">
+                        <Input
+                          id="labelsX"
+                          type="number"
+                          min="1"
+                          max="10"
+                          value={config.labelsX}
+                          onChange={(e) =>
+                            updateConfig("labelsX", parseInt(e.target.value) || 1)
+                          }
+                          placeholder="Cols"
+                        />
+                        <span className="flex items-center text-muted-foreground">×</span>
+                        <Input
+                          id="labelsY"
+                          type="number"
+                          min="1"
+                          max="20"
+                          value={config.labelsY}
+                          onChange={(e) =>
+                            updateConfig("labelsY", parseInt(e.target.value) || 1)
+                          }
+                          placeholder="Rows"
+                        />
+                      </div>
                     </div>
+                    
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <Label htmlFor="labelsY">Rows</Label>
+                        <Label>Layout Method</Label>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Info className="h-3 w-3 text-muted-foreground" />
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Number of label rows per page</p>
+                            <p>Choose how to define your layout</p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
-                      <Input
-                        id="labelsY"
-                        type="number"
-                        min="1"
-                        max="20"
-                        value={config.labelsY}
-                        onChange={(e) =>
-                          updateConfig("labelsY", parseInt(e.target.value) || 1)
-                        }
-                      />
+                      <IconButtonGroup
+                        value={config.layoutMode}
+                        onValueChange={(value) => updateConfig("layoutMode", value)}
+                      >
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <IconButtonGroupItem value="gaps">
+                              <Move className="h-4 w-4" />
+                            </IconButtonGroupItem>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Specify Gaps - Define spacing between labels</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <IconButtonGroupItem value="dimensions">
+                              <RectangleHorizontal className="h-4 w-4" />
+                            </IconButtonGroupItem>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Specify Dimensions - Define exact label size</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </IconButtonGroup>
                     </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="gapHorizontal">H. Gap (mm)</Label>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="h-3 w-3 text-muted-foreground" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>
-                              Horizontal space between labels in millimeters
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
+                  </div>
+                  
+                  {/* Conditional fields based on layout mode */}
+                  {config.layoutMode === "gaps" ? (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="gapHorizontal">H. Gap (mm)</Label>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3 w-3 text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Horizontal space between labels in millimeters</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <Input
+                          id="gapHorizontal"
+                          type="number"
+                          min="0"
+                          max="20"
+                          step="0.1"
+                          value={config.gapHorizontal}
+                          onChange={(e) =>
+                            updateConfig(
+                              "gapHorizontal",
+                              parseFloat(e.target.value) || 0
+                            )
+                          }
+                        />
                       </div>
-                      <Input
-                        id="gapHorizontal"
-                        type="number"
-                        min="0"
-                        max="20"
-                        value={config.gapHorizontal}
-                        onChange={(e) =>
-                          updateConfig(
-                            "gapHorizontal",
-                            parseFloat(e.target.value) || 0
-                          )
-                        }
-                      />
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="gapVertical">V. Gap (mm)</Label>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3 w-3 text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Vertical space between labels in millimeters</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <Input
+                          id="gapVertical"
+                          type="number"
+                          min="0"
+                          max="20"
+                          step="0.1"
+                          value={config.gapVertical}
+                          onChange={(e) =>
+                            updateConfig(
+                              "gapVertical",
+                              parseFloat(e.target.value) || 0
+                            )
+                          }
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="gapVertical">V. Gap (mm)</Label>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="h-3 w-3 text-muted-foreground" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Vertical space between labels in millimeters</p>
-                          </TooltipContent>
-                        </Tooltip>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="labelWidth">Label Width (mm)</Label>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3 w-3 text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Width of each label in millimeters</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <Input
+                          id="labelWidth"
+                          type="number"
+                          min="5"
+                          max="200"
+                          step="0.1"
+                          value={config.labelWidth}
+                          onChange={(e) =>
+                            updateConfig(
+                              "labelWidth",
+                              parseFloat(e.target.value) || 5
+                            )
+                          }
+                        />
                       </div>
-                      <Input
-                        id="gapVertical"
-                        type="number"
-                        min="0"
-                        max="20"
-                        value={config.gapVertical}
-                        onChange={(e) =>
-                          updateConfig(
-                            "gapVertical",
-                            parseFloat(e.target.value) || 0
-                          )
-                        }
-                      />
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="labelHeight">Label Height (mm)</Label>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3 w-3 text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Height of each label in millimeters</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <Input
+                          id="labelHeight"
+                          type="number"
+                          min="5"
+                          max="200"
+                          step="0.1"
+                          value={config.labelHeight}
+                          onChange={(e) =>
+                            updateConfig(
+                              "labelHeight",
+                              parseFloat(e.target.value) || 5
+                            )
+                          }
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Auto-calculated values display */}
+                  <div className="bg-muted/30 p-3 rounded-lg">
+                    <div className="text-sm text-muted-foreground space-y-1">
+                      {config.layoutMode === "gaps" ? (
+                        <p>
+                          <strong>Calculated label size:</strong> {config.labelWidth.toFixed(1)} × {config.labelHeight.toFixed(1)} mm
+                        </p>
+                      ) : (
+                        <p>
+                          <strong>Calculated gaps:</strong> H: {config.gapHorizontal.toFixed(1)}mm, V: {config.gapVertical.toFixed(1)}mm
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -733,32 +911,46 @@ export function LabelGenerator({
                 {/* Label Settings */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium">Label Properties</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <Label htmlFor="labelShape">Shape</Label>
+                        <Label>Shape</Label>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Info className="h-3 w-3 text-muted-foreground" />
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Rectangular or circular label shape</p>
+                            <p>Choose rectangular or circular labels</p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
-                      <Select
+                      <IconButtonGroup
                         value={config.labelShape}
                         onValueChange={(value) => updateConfig("labelShape", value)}
                       >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="rectangular">Rectangular</SelectItem>
-                          <SelectItem value="circular">Circular</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <IconButtonGroupItem value="rectangular">
+                              <Square className="h-4 w-4" />
+                            </IconButtonGroupItem>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Rectangular Labels</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <IconButtonGroupItem value="circular">
+                              <Circle className="h-4 w-4" />
+                            </IconButtonGroupItem>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Circular Labels</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </IconButtonGroup>
                     </div>
+                    
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <Label htmlFor="labelPadding">Padding (mm)</Label>
@@ -956,7 +1148,7 @@ export function LabelGenerator({
                 <div className="text-sm text-muted-foreground space-y-1">
                   <p>
                     <strong>Label size:</strong> {labelWidth.toFixed(1)} ×{" "}
-                    {labelHeight.toFixed(1)} {currentPaper.unit}
+                    {labelHeight.toFixed(1)} mm
                   </p>
                   <p>
                     <strong>Labels per page:</strong> {config.labelsX} ×{" "}
