@@ -20,6 +20,11 @@ interface LabelPDFProps {
 const mmToPoints = (mm: number) => mm * 2.834645669;
 
 export function LabelPDF({ config, codes }: LabelPDFProps) {
+  // Helper function to calculate the largest square that fits in a circle
+  const getInscribedSquareSize = (circleRadius: number) => {
+    return circleRadius * Math.sqrt(2);
+  };
+
   const paperSizes = {
     A4: { width: mmToPoints(210), height: mmToPoints(297) },
     US_LETTER: { width: mmToPoints(216), height: mmToPoints(279) },
@@ -43,6 +48,27 @@ export function LabelPDF({ config, codes }: LabelPDFProps) {
     (availableHeight - mmToPoints((config.labelsY - 1) * config.gapVertical)) /
     config.labelsY;
 
+  // Calculate content area for barcode placement
+  const paddingPoints = mmToPoints(config.labelPadding);
+  const contentWidth = labelWidth - (paddingPoints * 2);
+  const contentHeight = labelHeight - (paddingPoints * 2);
+  
+  let barcodeArea;
+  if (config.labelShape === "circular") {
+    const radius = Math.min(labelWidth, labelHeight) / 2;
+    const contentRadius = radius - paddingPoints;
+    const squareSize = getInscribedSquareSize(contentRadius);
+    barcodeArea = {
+      width: squareSize,
+      height: squareSize,
+    };
+  } else {
+    barcodeArea = {
+      width: contentWidth,
+      height: contentHeight,
+    };
+  }
+
   const styles = StyleSheet.create({
     page: {
       flexDirection: "column",
@@ -65,6 +91,8 @@ export function LabelPDF({ config, codes }: LabelPDFProps) {
       marginRight: mmToPoints(config.gapHorizontal),
       justifyContent: "center",
       alignItems: "center",
+      borderRadius: config.labelShape === "circular" ? labelWidth / 2 : 0,
+      overflow: "hidden",
     },
     lastLabel: {
       width: labelWidth,
@@ -72,13 +100,17 @@ export function LabelPDF({ config, codes }: LabelPDFProps) {
       marginRight: 0,
       justifyContent: "center",
       alignItems: "center",
+      borderRadius: config.labelShape === "circular" ? labelWidth / 2 : 0,
+      overflow: "hidden",
     },
     qrCode: {
-      width: Math.min(labelWidth * 0.8, labelHeight * 0.8),
-      height: Math.min(labelWidth * 0.8, labelHeight * 0.8),
+      width: Math.min(barcodeArea.width * (config.includeText ? 0.7 : 0.9), barcodeArea.height * (config.includeText ? 0.7 : 0.9)),
+      height: Math.min(barcodeArea.width * (config.includeText ? 0.7 : 0.9), barcodeArea.height * (config.includeText ? 0.7 : 0.9)),
     },
     codeText: {
-      fontSize: Math.min(labelWidth * 0.08, labelHeight * 0.08, 8),
+      fontSize: config.labelShape === "circular" 
+        ? Math.min(barcodeArea.width * 0.08, 6)
+        : Math.min(barcodeArea.width * 0.06, barcodeArea.height * 0.06, 8),
       textAlign: "center" as const,
       marginTop: 2,
       fontFamily: "Courier",

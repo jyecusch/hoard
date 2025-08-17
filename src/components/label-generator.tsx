@@ -60,6 +60,8 @@ export interface LabelConfig {
   skipLabels: string;
   skipLabelNumbers: number[];
   includeText: boolean;
+  labelShape: "rectangular" | "circular";
+  labelPadding: number;
 }
 
 interface LabelGeneratorProps {
@@ -138,6 +140,8 @@ export function LabelGenerator({
     skipLabels: "",
     skipLabelNumbers: [],
     includeText: false,
+    labelShape: "rectangular",
+    labelPadding: 2,
   });
 
   const [previewScale, setPreviewScale] = useState(0.3);
@@ -720,6 +724,62 @@ export function LabelGenerator({
                             "gapVertical",
                             parseFloat(e.target.value) || 0
                           )
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Label Settings */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Label Properties</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="labelShape">Shape</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Rectangular or circular label shape</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Select
+                        value={config.labelShape}
+                        onValueChange={(value) => updateConfig("labelShape", value)}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="rectangular">Rectangular</SelectItem>
+                          <SelectItem value="circular">Circular</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="labelPadding">Padding (mm)</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Space between barcode and label edge</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
+                        id="labelPadding"
+                        type="number"
+                        min="0"
+                        max="10"
+                        step="0.5"
+                        value={config.labelPadding}
+                        onChange={(e) =>
+                          updateConfig("labelPadding", parseFloat(e.target.value) || 0)
                         }
                       />
                     </div>
