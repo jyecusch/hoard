@@ -25,7 +25,21 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Download, FileText, Settings, Eye, Info } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  Download,
+  FileText,
+  Settings,
+  Eye,
+  Info,
+  ChevronDown,
+  Package2,
+  Ruler,
+} from "lucide-react";
 import { LabelPreview } from "./label-preview";
 
 export interface LabelConfig {
@@ -51,10 +65,60 @@ interface LabelGeneratorProps {
   isGenerating?: boolean;
 }
 
+// Common label sheet presets
+const labelPresets = {
+  "template-30": {
+    name: "30 labels (3×10)",
+    labelsX: 3,
+    labelsY: 10,
+    marginTop: 13,
+    marginBottom: 13,
+    marginLeft: 8,
+    marginRight: 8,
+    gapH: 3,
+    gapV: 0,
+  },
+  "template-21": {
+    name: "21 labels (3×7)",
+    labelsX: 3,
+    labelsY: 7,
+    marginTop: 15,
+    marginBottom: 15,
+    marginLeft: 7,
+    marginRight: 7,
+    gapH: 3,
+    gapV: 0,
+  },
+  "template-14": {
+    name: "14 labels (2×7)",
+    labelsX: 2,
+    labelsY: 7,
+    marginTop: 15,
+    marginBottom: 15,
+    marginLeft: 15,
+    marginRight: 15,
+    gapH: 5,
+    gapV: 0,
+  },
+  custom: {
+    name: "Custom layout",
+    labelsX: 3,
+    labelsY: 8,
+    marginTop: 15,
+    marginBottom: 15,
+    marginLeft: 15,
+    marginRight: 15,
+    gapH: 5,
+    gapV: 5,
+  },
+};
+
 export function LabelGenerator({
   onGenerate,
   isGenerating = false,
 }: LabelGeneratorProps) {
+  const [selectedPreset, setSelectedPreset] = useState<string>("custom");
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [config, setConfig] = useState<LabelConfig>({
     paperSize: "A4",
     labelsX: 3,
@@ -158,13 +222,13 @@ export function LabelGenerator({
   };
 
   const formatSkipLabelsAsRanges = (numbers: number[]): string => {
-    if (numbers.length === 0) return '';
-    
+    if (numbers.length === 0) return "";
+
     const sorted = [...numbers].sort((a, b) => a - b);
     const ranges: string[] = [];
     let rangeStart = sorted[0];
     let rangeEnd = sorted[0];
-    
+
     for (let i = 1; i < sorted.length; i++) {
       if (sorted[i] === rangeEnd + 1) {
         // Continue the range
@@ -185,7 +249,7 @@ export function LabelGenerator({
         rangeEnd = sorted[i];
       }
     }
-    
+
     // Handle the last range
     if (rangeStart === rangeEnd) {
       ranges.push(rangeStart.toString());
@@ -195,13 +259,13 @@ export function LabelGenerator({
     } else {
       ranges.push(`${rangeStart}-${rangeEnd}`);
     }
-    
-    return ranges.join(', ');
+
+    return ranges.join(", ");
   };
 
   const handleSkipToggle = (labelNumber: number) => {
     const currentSkipLabels = new Set(config.skipLabelNumbers);
-    
+
     if (currentSkipLabels.has(labelNumber)) {
       // Remove from skip list
       currentSkipLabels.delete(labelNumber);
@@ -209,12 +273,12 @@ export function LabelGenerator({
       // Add to skip list
       currentSkipLabels.add(labelNumber);
     }
-    
+
     const newSkipNumbers = Array.from(currentSkipLabels).sort((a, b) => a - b);
-    
+
     // Format the skip labels string using ranges
     const skipLabelsString = formatSkipLabelsAsRanges(newSkipNumbers);
-    
+
     setConfig({
       ...config,
       skipLabelNumbers: newSkipNumbers,
@@ -256,11 +320,14 @@ export function LabelGenerator({
               Configure your label layout and generate printable QR code sheets
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Paper Settings */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Paper Settings</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <CardContent className="space-y-6">
+            {/* Quick Start - Most Important Settings */}
+            <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
+              <h3 className="text-lg font-medium flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                Quick Setup
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Label htmlFor="paperSize">Paper Size</Label>
@@ -277,7 +344,7 @@ export function LabelGenerator({
                     value={config.paperSize}
                     onValueChange={(value) => updateConfig("paperSize", value)}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -292,6 +359,58 @@ export function LabelGenerator({
                       <SelectItem value="A3">A3 (297 × 420 mm)</SelectItem>
                       <SelectItem value="TABLOID">
                         Tabloid (11 × 17 in)
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="preset">Template</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3 w-3 text-muted-foreground" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Common label sheet layouts</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <Select
+                    value={selectedPreset}
+                    onValueChange={(value) => {
+                      setSelectedPreset(value);
+                      if (value !== "custom") {
+                        const preset =
+                          labelPresets[value as keyof typeof labelPresets];
+                        setConfig((prev) => ({
+                          ...prev,
+                          labelsX: preset.labelsX,
+                          labelsY: preset.labelsY,
+                          marginTop: preset.marginTop,
+                          marginBottom: preset.marginBottom,
+                          marginLeft: preset.marginLeft,
+                          marginRight: preset.marginRight,
+                          gapHorizontal: preset.gapH,
+                          gapVertical: preset.gapV,
+                          numLabels:
+                            preset.labelsX * preset.labelsY * prev.numPages,
+                        }));
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="custom">Custom layout</SelectItem>
+                      <SelectItem value="template-30">
+                        30 labels (3×10)
+                      </SelectItem>
+                      <SelectItem value="template-21">
+                        21 labels (3×7)
+                      </SelectItem>
+                      <SelectItem value="template-14">
+                        14 labels (2×7)
                       </SelectItem>
                     </SelectContent>
                   </Select>
@@ -313,7 +432,7 @@ export function LabelGenerator({
                     value={config.codeType}
                     onValueChange={(value) => updateConfig("codeType", value)}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -327,7 +446,10 @@ export function LabelGenerator({
 
             {/* Quantity Settings */}
             <div className="space-y-4">
-              <h3 className="text-lg font-medium">Quantity</h3>
+              <h3 className="text-lg font-medium flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                How Many Labels?
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
@@ -347,7 +469,7 @@ export function LabelGenerator({
                     value={config.inputMode}
                     onValueChange={(value) => updateConfig("inputMode", value)}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -434,223 +556,273 @@ export function LabelGenerator({
               </div>
             </div>
 
-            {/* Layout Settings */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Layout</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="labelsX">Columns</Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-3 w-3 text-muted-foreground" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Number of label columns per page</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <Input
-                    id="labelsX"
-                    type="number"
-                    min="1"
-                    max="10"
-                    value={config.labelsX}
-                    onChange={(e) =>
-                      updateConfig("labelsX", parseInt(e.target.value) || 1)
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="labelsY">Rows</Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-3 w-3 text-muted-foreground" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Number of label rows per page</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <Input
-                    id="labelsY"
-                    type="number"
-                    min="1"
-                    max="20"
-                    value={config.labelsY}
-                    onChange={(e) =>
-                      updateConfig("labelsY", parseInt(e.target.value) || 1)
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="gapHorizontal">H. Gap (mm)</Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-3 w-3 text-muted-foreground" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Horizontal space between labels in millimeters</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <Input
-                    id="gapHorizontal"
-                    type="number"
-                    min="0"
-                    max="20"
-                    value={config.gapHorizontal}
-                    onChange={(e) =>
-                      updateConfig(
-                        "gapHorizontal",
-                        parseFloat(e.target.value) || 0
-                      )
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="gapVertical">V. Gap (mm)</Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-3 w-3 text-muted-foreground" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Vertical space between labels in millimeters</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <Input
-                    id="gapVertical"
-                    type="number"
-                    min="0"
-                    max="20"
-                    value={config.gapVertical}
-                    onChange={(e) =>
-                      updateConfig(
-                        "gapVertical",
-                        parseFloat(e.target.value) || 0
-                      )
-                    }
-                  />
-                </div>
+            {/* Advanced Settings - Collapsible */}
+            <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+              <div className="flex gap-2">
+                <CollapsibleTrigger asChild>
+                  <Button variant="outline" className="flex-1 justify-between">
+                    <span className="flex items-center gap-2">
+                      <Ruler className="h-4 w-4" />
+                      Advanced Layout Settings
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform ${showAdvanced ? "rotate-180" : ""}`}
+                    />
+                  </Button>
+                </CollapsibleTrigger>
+                {selectedPreset === "custom" && showAdvanced && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const preset = labelPresets.custom;
+                      setConfig((prev) => ({
+                        ...prev,
+                        labelsX: preset.labelsX,
+                        labelsY: preset.labelsY,
+                        marginTop: preset.marginTop,
+                        marginBottom: preset.marginBottom,
+                        marginLeft: preset.marginLeft,
+                        marginRight: preset.marginRight,
+                        gapHorizontal: preset.gapH,
+                        gapVertical: preset.gapV,
+                        numLabels:
+                          preset.labelsX * preset.labelsY * prev.numPages,
+                      }));
+                    }}
+                  >
+                    Reset
+                  </Button>
+                )}
               </div>
-            </div>
+              <CollapsibleContent className="space-y-6 pt-4">
+                {/* Layout Settings */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Layout Grid</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="labelsX">Columns</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Number of label columns per page</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
+                        id="labelsX"
+                        type="number"
+                        min="1"
+                        max="10"
+                        value={config.labelsX}
+                        onChange={(e) =>
+                          updateConfig("labelsX", parseInt(e.target.value) || 1)
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="labelsY">Rows</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Number of label rows per page</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
+                        id="labelsY"
+                        type="number"
+                        min="1"
+                        max="20"
+                        value={config.labelsY}
+                        onChange={(e) =>
+                          updateConfig("labelsY", parseInt(e.target.value) || 1)
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="gapHorizontal">H. Gap (mm)</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>
+                              Horizontal space between labels in millimeters
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
+                        id="gapHorizontal"
+                        type="number"
+                        min="0"
+                        max="20"
+                        value={config.gapHorizontal}
+                        onChange={(e) =>
+                          updateConfig(
+                            "gapHorizontal",
+                            parseFloat(e.target.value) || 0
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="gapVertical">V. Gap (mm)</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Vertical space between labels in millimeters</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
+                        id="gapVertical"
+                        type="number"
+                        min="0"
+                        max="20"
+                        value={config.gapVertical}
+                        onChange={(e) =>
+                          updateConfig(
+                            "gapVertical",
+                            parseFloat(e.target.value) || 0
+                          )
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
 
-            {/* Margins */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Margins (mm)</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="marginTop">Top</Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-3 w-3 text-muted-foreground" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Top margin in millimeters</p>
-                      </TooltipContent>
-                    </Tooltip>
+                {/* Margins */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Margins (mm)</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="marginTop">Top</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Top margin in millimeters</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
+                        id="marginTop"
+                        type="number"
+                        min="0"
+                        max="50"
+                        value={config.marginTop}
+                        onChange={(e) =>
+                          updateConfig(
+                            "marginTop",
+                            parseFloat(e.target.value) || 0
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="marginRight">Right</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Right margin in millimeters</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
+                        id="marginRight"
+                        type="number"
+                        min="0"
+                        max="50"
+                        value={config.marginRight}
+                        onChange={(e) =>
+                          updateConfig(
+                            "marginRight",
+                            parseFloat(e.target.value) || 0
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="marginBottom">Bottom</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Bottom margin in millimeters</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
+                        id="marginBottom"
+                        type="number"
+                        min="0"
+                        max="50"
+                        value={config.marginBottom}
+                        onChange={(e) =>
+                          updateConfig(
+                            "marginBottom",
+                            parseFloat(e.target.value) || 0
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="marginLeft">Left</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Left margin in millimeters</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
+                        id="marginLeft"
+                        type="number"
+                        min="0"
+                        max="50"
+                        value={config.marginLeft}
+                        onChange={(e) =>
+                          updateConfig(
+                            "marginLeft",
+                            parseFloat(e.target.value) || 0
+                          )
+                        }
+                      />
+                    </div>
                   </div>
-                  <Input
-                    id="marginTop"
-                    type="number"
-                    min="0"
-                    max="50"
-                    value={config.marginTop}
-                    onChange={(e) =>
-                      updateConfig("marginTop", parseFloat(e.target.value) || 0)
-                    }
-                  />
                 </div>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="marginRight">Right</Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-3 w-3 text-muted-foreground" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Right margin in millimeters</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <Input
-                    id="marginRight"
-                    type="number"
-                    min="0"
-                    max="50"
-                    value={config.marginRight}
-                    onChange={(e) =>
-                      updateConfig(
-                        "marginRight",
-                        parseFloat(e.target.value) || 0
-                      )
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="marginBottom">Bottom</Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-3 w-3 text-muted-foreground" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Bottom margin in millimeters</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <Input
-                    id="marginBottom"
-                    type="number"
-                    min="0"
-                    max="50"
-                    value={config.marginBottom}
-                    onChange={(e) =>
-                      updateConfig(
-                        "marginBottom",
-                        parseFloat(e.target.value) || 0
-                      )
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="marginLeft">Left</Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-3 w-3 text-muted-foreground" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Left margin in millimeters</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <Input
-                    id="marginLeft"
-                    type="number"
-                    min="0"
-                    max="50"
-                    value={config.marginLeft}
-                    onChange={(e) =>
-                      updateConfig(
-                        "marginLeft",
-                        parseFloat(e.target.value) || 0
-                      )
-                    }
-                  />
-                </div>
-              </div>
-            </div>
+              </CollapsibleContent>
+            </Collapsible>
 
             {/* Preview Section */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium">Preview</h3>
+                <h3 className="text-lg font-medium flex items-center gap-2">
+                  <Eye className="h-4 w-4" />
+                  Live Preview
+                </h3>
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-2">
                     <Label htmlFor="previewScale" className="text-sm">
@@ -690,10 +862,10 @@ export function LabelGenerator({
               </div>
 
               <div className="border rounded-lg p-4">
-                <LabelPreview 
-                  config={config} 
-                  scale={previewScale} 
-                  onSkipToggle={handleSkipToggle} 
+                <LabelPreview
+                  config={config}
+                  scale={previewScale}
+                  onSkipToggle={handleSkipToggle}
                 />
               </div>
 
@@ -708,34 +880,37 @@ export function LabelGenerator({
                     {config.labelsY} = {config.labelsX * config.labelsY}
                   </p>
                   <p>
-                    <strong>Total labels:</strong> {config.numLabels} across{" "}
-                    {config.numPages} page(s)
+                    <strong>Labels total:</strong>{" "}
+                    {config.numLabels -
+                      config.skipLabelNumbers.filter(
+                        (n) => n <= config.numLabels
+                      ).length}{" "}
+                    across {config.numPages} page(s)
+                    {config.skipLabelNumbers.length > 0 && (
+                      <span className="italic">
+                        {" - skipping: "}
+                        {config.skipLabelNumbers.length} label
+                        {config.skipLabelNumbers.length !== 1 ? "s" : ""} (
+                        {formatSkipLabelsAsRanges(config.skipLabelNumbers)})
+                      </span>
+                    )}
                   </p>
-                  {config.skipLabelNumbers.length > 0 && (
-                    <>
-                      <p className="text-sm text-muted-foreground">
-                        <strong>Skipping labels:</strong>{" "}
-                        {config.skipLabelNumbers.length} label{config.skipLabelNumbers.length !== 1 ? 's' : ''} ({formatSkipLabelsAsRanges(config.skipLabelNumbers)})
-                      </p>
-                      <p className="text-sm text-green-600">
-                        <strong>Labels to generate:</strong>{" "}
-                        {config.numLabels - config.skipLabelNumbers.filter(n => n <= config.numLabels).length}
-                      </p>
-                    </>
-                  )}
                 </div>
               </div>
             </div>
 
-            {/* Generate Button - Outside tabs so it's always visible */}
-            <div className="mt-6">
+            {/* Generate Button - More Prominent */}
+            <div className="mt-6 p-4 bg-primary/5 rounded-lg border-2 border-primary/20">
               <Button
                 onClick={() => onGenerate(config)}
-                className="w-full"
+                className="w-full h-12 text-base"
+                size="lg"
                 disabled={isGenerating}
               >
-                <Download className="h-4 w-4 mr-2" />
-                {isGenerating ? "Generating PDF..." : "Generate QR Code Labels"}
+                <Download className="h-5 w-5 mr-2" />
+                {isGenerating
+                  ? "Generating PDF..."
+                  : `Generate ${config.numLabels - config.skipLabelNumbers.filter((n) => n <= config.numLabels).length} Labels`}
               </Button>
             </div>
           </CardContent>
