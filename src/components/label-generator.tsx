@@ -45,10 +45,9 @@ import {
 } from "lucide-react";
 import { LabelPreview } from "./label-preview";
 import { IconButtonGroup, IconButtonGroupItem } from "@/components/ui/icon-button-group";
-import { PAPER_SIZES } from "./paper-sizes";
 
 export interface LabelConfig {
-  paperSize: keyof typeof PAPER_SIZES;
+  paperSize: "A4" | "US_LETTER" | "A5" | "US_LEGAL" | "A3" | "TABLOID";
   labelsX: number;
   labelsY: number;
   marginTop: number;
@@ -156,6 +155,15 @@ export function LabelGenerator({
 
   const [previewScale, setPreviewScale] = useState(0.3);
 
+  // Paper size definitions
+  const paperSizes = {
+    A4: { width: 210, height: 297, unit: "mm" },
+    US_LETTER: { width: 216, height: 279, unit: "mm" },
+    A5: { width: 148, height: 210, unit: "mm" },
+    US_LEGAL: { width: 216, height: 356, unit: "mm" },
+    A3: { width: 297, height: 420, unit: "mm" },
+    TABLOID: { width: 279, height: 432, unit: "mm" },
+  };
 
   const parseSkipLabels = (input: string): number[] => {
     if (!input.trim()) return [];
@@ -201,7 +209,7 @@ export function LabelGenerator({
 
   // Helper function to calculate gaps from label dimensions
   const calculateGapsFromDimensions = (config: LabelConfig) => {
-    const paper = PAPER_SIZES[config.paperSize];
+    const paper = paperSizes[config.paperSize];
     const availableWidth = paper.width - config.marginLeft - config.marginRight;
     const availableHeight = paper.height - config.marginTop - config.marginBottom;
     
@@ -219,7 +227,7 @@ export function LabelGenerator({
 
   // Helper function to calculate label dimensions from gaps
   const calculateDimensionsFromGaps = (config: LabelConfig) => {
-    const paper = PAPER_SIZES[config.paperSize];
+    const paper = paperSizes[config.paperSize];
     const availableWidth = paper.width - config.marginLeft - config.marginRight;
     const availableHeight = paper.height - config.marginTop - config.marginBottom;
     
@@ -371,7 +379,7 @@ export function LabelGenerator({
     });
   };
 
-  const currentPaper = PAPER_SIZES[config.paperSize];
+  const currentPaper = paperSizes[config.paperSize];
   const availableWidth =
     currentPaper.width - config.marginLeft - config.marginRight;
   const availableHeight =

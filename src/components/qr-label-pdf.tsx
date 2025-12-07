@@ -91,7 +91,7 @@ export function LabelPDF({ config, codes }: LabelPDFProps) {
       marginRight: mmToPoints(config.gapHorizontal),
       justifyContent: "center",
       alignItems: "center",
-      borderRadius: config.labelShape === "circular" ? labelWidth / 2 : 0,
+      ...(config.labelShape === "circular" ? { borderRadius: Math.round(labelWidth / 2) } : {}),
       overflow: "hidden",
     },
     lastLabel: {
@@ -100,7 +100,7 @@ export function LabelPDF({ config, codes }: LabelPDFProps) {
       marginRight: 0,
       justifyContent: "center",
       alignItems: "center",
-      borderRadius: config.labelShape === "circular" ? labelWidth / 2 : 0,
+      ...(config.labelShape === "circular" ? { borderRadius: Math.round(labelWidth / 2) } : {}),
       overflow: "hidden",
     },
     qrCode: {
