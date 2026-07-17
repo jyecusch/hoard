@@ -1,0 +1,122 @@
+name: hoard
+
+# Hoard homelab deployment — pulls prebuilt images from GHCR (built by
+# .github/workflows/build.yml). Copy this directory to your server, create a
+# .env next to this file (see .env.example), then:
+#
+#   docker compose up -d
+#   docker compose --profile setup run --rm publish   # once, and after schema updates
+#
+# The app image ships with config sentinels; JAZZ_APP_ID / JAZZ_SERVER_URL are
+# substituted into the client bundle by the entrypoint on every container
+# start, so no image rebuild is needed to (re)configure a deployment.
+
+x-images:
+  app-image: &app-image ghcr.io/jyecusch/hoard/app:${HOARD_TAG:-latest}
+  jazz-image: &jazz-image ghcr.io/jyecusch/hoard/jazz:${HOARD_TAG:-latest}
+
+services:
+  app:
+    image: *app-image
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      AUTH_DB_DIR: /data
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env}
+      BETTER_AUTH_URL: ${APP_ORIGIN:-https://${DOMAIN}}
+      # Substituted into the client bundle at container start.
+      JAZZ_APP_ID: ${JAZZ_APP_ID:?set JAZZ_APP_ID in .env}
+      JAZZ_SERVER_URL: ${SYNC_ORIGIN:-https://${SYNC_DOMAIN:-sync.${DOMAIN}}}
+      # AI capture enrichment (optional — app works without it).
+      AI_PROVIDER: ${AI_PROVIDER:-}
+      AI_MODEL: ${AI_MODEL:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - auth-data:/data
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/api/auth/ok').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  jazz:
+    image: *jazz-image
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      JAZZ_APP_ID: ${JAZZ_APP_ID}
+      JAZZ_ADMIN_SECRET: ${JAZZ_ADMIN_SECRET:?set JAZZ_ADMIN_SECRET in .env}
+      # Validate client JWTs against Better Auth's JWKS, served by the app
+      # container. External-JWT auth only.
+      JAZZ_JWKS_URL: http://app:3000/api/auth/jwks
+    volumes:
+      - jazz-data:/data
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:4200/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # One-shot: publish the schema + permissions (baked into the jazz image) to
+  # the running sync server. Run after first boot and after image updates that
+  # change the schema:
+  #   docker compose --profile setup run --rm publish
+  publish:
+    image: *jazz-image
+    profiles: [setup]
+    environment:
+      JAZZ_APP_ID: ${JAZZ_APP_ID}
+      JAZZ_SERVER_URL: http://jazz:4200
+      JAZZ_ADMIN_SECRET: ${JAZZ_ADMIN_SECRET}
+    depends_on:
+      jazz:
+        condition: service_healthy
+    working_dir: /srv/schema
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - exec /srv/node_modules/.bin/jazz-tools deploy "$JAZZ_APP_ID"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - '${CADDY_HTTP_PORT:-80}:80'
+      - '${CADDY_HTTPS_PORT:-443}:443'
+      - '${CADDY_HTTPS_PORT:-443}:443/udp' # HTTP/3
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+      SYNC_DOMAIN: ${SYNC_DOMAIN:-sync.${DOMAIN}}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+      - jazz
+
+volumes:
+  # Better Auth sqlite database (users/sessions/JWKS keys). Back this up.
+  auth-data:
+  # Jazz sync server data dir (all inventory data + blobs). Back this up.
+  jazz-data:
+  # Caddy TLS certificates / ACME state.
+  caddy-data:
+  caddy-config:
