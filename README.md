@@ -1,149 +1,103 @@
-# Hoard - Digital Inventory Management System
+# Hoard
 
-A modern web application for organizing and tracking your physical items using a hierarchical container system with QR/DataMatrix code support.
+Self-hosted, local-first home inventory. Organize your stuff into nested containers,
+stick pre-printed QR/DataMatrix labels on opaque boxes, scan a label to see what's
+inside, search vaguely ("wire squeezer thing") and still find the crimper, and keep
+track of tools you've lent out.
+
+> **Note**: this is a personal project for organizing my own home, and the code is
+> written almost entirely by AI (Claude) with me directing. It scratches my itch and
+> is shared as-is — expect pragmatic choices over polish, and use accordingly.
+
+Built on [Jazz 2](https://jazz.tools) (public alpha) — the app reads and writes a local
+replica that syncs to your own Jazz server; everything works offline and updates in
+real time across devices. See `SPEC.md` for the full product/architecture spec.
 
 ## Features
 
-- **Hierarchical Organization**: Organize items in nested containers (boxes, rooms, shelves, etc.)
-- **QR & DataMatrix Codes**: Generate and scan codes for quick item identification
-- **Photo Management**: Upload and manage photos for containers and items
-- **Smart Search**: Find items quickly across your entire inventory
-- **Tagging System**: Add tags to categorize and filter items
-- **Favorites**: Mark frequently accessed containers for quick access
-- **Real-time Sync**: Powered by Zero for instant data synchronization
+- **Nested containers**: House → Garage → Shelf → Tub → Item, any depth.
+- **Pre-print + assign labels**: generate PDF sheets of uniquely-coded QR/DataMatrix
+  labels (`/labels`), stick them on boxes, then scanning an unassigned label offers to
+  link it to a new or existing container.
+- **Scan to open** (`/scan`): camera scanning (QR + DataMatrix) or type the code.
+- **Rapid capture** (`/capture`): scan label (optional) → photo → AI-suggested name →
+  save & next. ~10 seconds per item for weekend-cataloging the whole house.
+- **AI-enriched search**: at capture time an AI vision model (provider-configurable,
+  optional) writes rich keywords/synonyms; search itself is instant, offline, and
+  typo-tolerant (Cmd-K on desktop, Search tab on mobile).
+- **Photos**: compressed client-side, synced as blobs, gallery + fullscreen viewer.
+- **Lending**: "lent to Sarah since 3 Jul" on any item, dashboard list of everything
+  currently out, borrower autocomplete from history.
+- **Sharing**: invite links (viewer or editor) for any container — share the whole
+  garage or a single box; the subtree is shared recursively. Server-enforced
+  permissions (`permissions.ts`).
+- **Favorites**, dark mode, installable PWA, responsive desktop/mobile UI.
 
-## Tech Stack
+## Stack
 
-- **Frontend**: Next.js 15.4, React 19, TypeScript
-- **UI Components**: shadcn/ui with Tailwind CSS
-- **Database**: PostgreSQL with Drizzle ORM
-- **Real-time Sync**: Zero by Rocicorp
-- **Authentication**: Better Auth
-- **Image Processing**: Sharp for image optimization
-- **Barcode Support**: QR codes and DataMatrix generation/scanning
+TanStack Start (React 19, SPA mode) · Jazz 2 (`jazz-tools@alpha`) · Better Auth
+(email/password, JWT bridge to Jazz) · Tailwind 4 + shadcn/ui · bwip-js + pdf-lib
+(labels) · barcode-detector (scanning) · fuse.js (search) · Vercel AI SDK (capture
+enrichment).
 
-## Prerequisites
+Key files:
 
-- Node.js 18+ 
-- PostgreSQL database
-- Zero cache server (for real-time sync)
+- `schema.ts` — the data model (Jazz relational tables). **Keep exactly one file named
+  `schema.ts` in the repo** (the Jazz tooling discovers it by name); import it via the
+  `@schema` alias.
+- `permissions.ts` — server-enforced row policies (read the comments; some guards are
+  load-bearing).
+- `src/lib/` — data layer hooks (inventory, photos, loans, shares, favorites, search).
+- `src/routes/` — file-based routes; `_app/` is the auth-gated app shell,
+  `api/` are server routes (Better Auth, AI enrich).
+- `deploy/` — production Docker Compose setup (see `deploy/README.md`).
+
+## Development
+
+```bash
+npm install
+npm run auth:migrate   # create the Better Auth sqlite tables (first run only)
+npm run dev            # app + embedded Jazz dev server on http://localhost:4300
+```
+
+`.env` is created automatically by the Jazz vite plugin (app id) — add
+`BETTER_AUTH_SECRET` (any long random string) and optionally AI enrichment vars (see
+`.env.example`).
+
+HTTPS is required for camera access on real phones; for LAN testing use a tunnel or
+run behind a local TLS proxy.
+
+### Dev gotchas (Jazz 2 alpha)
+
+- **Changing `schema.ts` after you have data** requires a migration
+  (`npx jazz-tools@alpha migrations create …`) — or, in dev, just wipe the local server
+  store: `rm -rf node_modules/.cache/jazz-dev-server` and restart. Symptom of a missing
+  migration: "permissions schema X is not connected to the previous schema Y" and
+  broken reads.
+- **Don't select the `$canEdit` magic column** in queries — in the current alpha it
+  silently empties results for rows readable via shares. Editability is derived
+  client-side in `src/lib/inventory.ts`.
+- Permission-only edits to `permissions.ts` hot-push in dev and don't need migrations.
+- After a user's access set changes (e.g. accepting an invite), live subscriptions
+  don't pick up newly-readable rows; the app does a hard navigation at that point.
+
+### Scripts
+
+```bash
+npm run dev            # dev server (app + Jazz + auth)
+npm run build          # production build
+npm run lint           # eslint
+npm run auth:migrate   # (re)create Better Auth sqlite schema
+npm test               # vitest
+```
 
 ## Deployment
 
-For production deployment with HTTPS/WSS support using Docker Compose, see the [**Deployment Guide**](./deploy/README.md). We provide multiple HTTPS options:
-- **Caddy with Let's Encrypt** - Automatic SSL for domains with open ports
-- **Cloudflare Tunnel** - No open ports required, works behind firewalls
-- **Local HTTPS** - Self-signed certificates for testing
+Two options, same architecture (app server + self-hosted Jazz sync server + Caddy
+with automatic HTTPS):
 
-## Development Setup
-
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/hoard.git
-cd hoard
-```
-
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Set up environment variables:
-Create a `.env.local` file with:
-```env
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/hoard
-
-# Zero Configuration
-NEXT_PUBLIC_ZERO_SERVER=http://localhost:4848
-ZERO_UPSTREAM_DB=postgresql://user:password@localhost:5432/hoard
-ZERO_CVR_DB=postgresql://user:password@localhost:5432/zero_cvr
-ZERO_CHANGE_DB=postgresql://user:password@localhost:5432/zero_cdb
-
-# Better Auth
-BETTER_AUTH_SECRET=your-secret-key
-BETTER_AUTH_URL=http://localhost:3000
-
-# Optional: HTTPS for development (for camera access)
-# Place certificates in /certificates folder
-```
-
-4. Set up the database:
-```bash
-npm run db:generate
-npm run db:migrate
-npm run db:seed  # Optional: seed with sample data
-```
-
-5. Start the Zero cache server:
-```bash
-npm run dev:zero
-```
-
-6. Run the development server:
-```bash
-npm run dev
-# or for HTTPS (required for camera/QR scanning)
-npm run dev:https
-```
-
-Open [http://localhost:3000](http://localhost:3000) to see the application.
-
-## Development Scripts
-
-```bash
-npm run dev              # Start development server
-npm run dev:https        # Start with HTTPS (for camera access)
-npm run dev:zero         # Start Zero cache server
-npm run build            # Build for production
-npm run start            # Start production server
-npm run lint             # Run ESLint
-npm run db:generate      # Generate Drizzle migrations
-npm run db:migrate       # Apply database migrations
-npm run db:push          # Push schema changes to database
-npm run db:seed          # Seed database with sample data
-npm run zero:generate    # Generate Zero schema from Drizzle
-```
-
-## Project Structure
-
-```
-hoard/
-├── src/
-│   ├── app/              # Next.js app router pages
-│   ├── components/       # React components
-│   │   ├── ui/          # shadcn/ui components
-│   │   └── ...          # Feature components
-│   ├── db/              # Database schema and migrations
-│   ├── hooks/           # Custom React hooks
-│   ├── lib/             # Utility functions and configurations
-│   ├── providers/       # React context providers
-│   └── types/           # TypeScript type definitions
-├── drizzle/             # Database migrations
-├── public/              # Static assets
-└── uploads/             # User uploaded images
-```
-
-## Key Features Explained
-
-### Container System
-Items are organized in a hierarchical structure where containers can hold both items and other containers. This allows for intuitive organization like:
-- House → Room → Closet → Box → Item
-- Garage → Shelf → Bin → Tool
-
-### Barcode Integration
-- Generate QR codes or DataMatrix codes for any container/item
-- Scan codes using device camera for instant navigation
-- Custom code assignment for existing labels
-
-### Image Management
-- Upload multiple photos per container/item
-- Automatic thumbnail generation
-- Gallery view with fullscreen support
-
-### Real-time Synchronization
-Powered by Zero, all changes are instantly synchronized across all connected clients without page refreshes.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+- **Prebuilt images (homelab)**: GitHub Actions builds multi-arch images to GHCR on
+  every push to `main` (`ghcr.io/jyecusch/hoard/app` and `…/jazz`); run them with
+  [`deploy/homelab/`](./deploy/homelab/README.md). The app image is configured
+  entirely at runtime via env vars — no rebuild to point it at your domain.
+- **Build from source**: [`deploy/README.md`](./deploy/README.md).
