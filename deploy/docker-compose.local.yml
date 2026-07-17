@@ -1,0 +1,22 @@
+# Local smoke-test override — NOT for production.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+#
+# Use with a .env like:
+#   DOMAIN=http://localhost            # scheme disables Caddy's TLS
+#   SYNC_DOMAIN=http://sync.localhost
+#   APP_ORIGIN=http://localhost:8080
+#   SYNC_ORIGIN=ws://localhost:4210    # jazz reached directly on the host port
+#
+# Publishes Caddy on 8080 (plain HTTP) instead of 80/443, and exposes the app
+# and jazz containers directly on localhost for curl-level verification.
+services:
+  caddy:
+    ports: !override
+      - '8080:80'
+  app:
+    ports:
+      - '127.0.0.1:3210:3000'
+  jazz:
+    ports:
+      - '127.0.0.1:4210:4200'

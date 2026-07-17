@@ -1,0 +1,17 @@
+# Reverse proxy for Hoard.
+#
+# DOMAIN / SYNC_DOMAIN come from the caddy service environment (.env).
+# Bare hostnames get automatic HTTPS (Let's Encrypt). For plain-HTTP local
+# testing set e.g. DOMAIN=http://localhost (scheme disables TLS).
+#
+# The sync site proxies the Jazz WebSocket upgrade at /apps/<appId>/ws —
+# Caddy's reverse_proxy handles WebSocket upgrades out of the box.
+
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:3000
+}
+
+{$SYNC_DOMAIN} {
+	reverse_proxy jazz:4200
+}

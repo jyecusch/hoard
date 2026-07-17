@@ -1,360 +1,163 @@
-# Hoard Deployment Guide
+# Hoard — production deployment
 
-This guide covers deploying Hoard with HTTPS/WSS support using Docker Compose. The app requires secure connections for browser features like camera access on mobile devices.
+> **Homelab / prebuilt images:** if you just want to run Hoard from the images
+> published to GHCR by CI (no building on the server), use
+> [`homelab/`](./homelab/README.md) instead. This document covers the
+> build-from-source compose stack; the architecture is identical.
 
-## Architecture Overview
+Docker Compose stack, three services:
 
-```mermaid
-graph LR
-    Internet[Internet] -->|HTTPS/WSS| RP[Reverse Proxy]
-    
-    subgraph Docker Network
-        RP --> |Port 3000| App[Next.js App]
-        RP --> |Port 8080| Zero[Zero Sync Server]
-        App --> |SQL| PG[(PostgreSQL)]
-        Zero --> |SQL| PG
-    end
-    
-    subgraph Reverse Proxy Options
-        Caddy[Caddy w/ Let's Encrypt]
-        CF[Cloudflare Tunnel]
-        Local[Local Caddy]
-    end
-    
-    style App fill:#4ade80
-    style Zero fill:#60a5fa
-    style PG fill:#fbbf24
-    style RP fill:#c084fc
+| Service | What it runs                                                                                           | Persistent data                 |
+| ------- | ------------------------------------------------------------------------------------------------------ | ------------------------------- |
+| `app`   | TanStack Start app (SPA + `/api/auth/*` Better Auth + `/api/enrich`) served by srvx on port 3000        | `auth-data` → `/data` (sqlite)  |
+| `jazz`  | Jazz 2 sync server (`jazz-tools server`) on port 4200, external-JWT auth via the app's JWKS             | `jazz-data` → `/data`           |
+| `caddy` | Reverse proxy + automatic HTTPS: `DOMAIN` → app, `SYNC_DOMAIN` → jazz (incl. WebSocket `/apps/<id>/ws`) | `caddy-data` (TLS certificates) |
+
+Auth flow in production: the browser gets a JWT from Better Auth
+(`/api/auth/token`), Jazz validates it against
+`http://app:3000/api/auth/jwks` inside the compose network. Local-first
+(self-signed Jazz) auth is disabled.
+
+## Prerequisites
+
+- Docker Engine 24+ with the compose plugin, ports 80/443 reachable.
+- Two DNS records pointing at the host: `DOMAIN` (e.g. `hoard.example.com`)
+  and `SYNC_DOMAIN` (default `sync.<DOMAIN>`).
+- Node 20+ on whatever machine you deploy the schema from (your workstation
+  with this repo checked out is fine).
+
+## First-time setup
+
+```sh
+cd deploy
+cp .env.example .env
 ```
 
-### Components
+Fill in `.env`:
 
-- **Next.js App**: Main application frontend and API
-- **Zero Sync Server**: Real-time data synchronization via WebSocket (using official Rocicorp image)
-- **PostgreSQL**: Database used by both Next.js and Zero (with separate DBs for Zero's CVR and change tracking)
-- **Reverse Proxy**: One of three options for HTTPS/WSS termination
+```sh
+# choose an app id (any stable identifier; uuid is conventional)
+uuidgen | tr 'A-Z' 'a-z'      # -> JAZZ_APP_ID
 
-## Quick Start
-
-1. **Clone the repository and navigate to deploy folder**
-   ```bash
-   git clone https://github.com/jyecusch/hoard.git
-   cd hoard/deploy
-   ```
-
-2. **Run the setup script**
-   ```bash
-   ./setup.sh
-   ```
-   The script will:
-   - Create `.env` file from template
-   - Generate secure secrets automatically
-   - Guide you through HTTPS configuration
-   - Start the services
-
-3. **Access your application**
-   - Caddy profile: `https://yourdomain.com`
-   - Cloudflare profile: Check your tunnel's public hostname
-   - Local profile: `https://localhost`
-
-## HTTPS Options
-
-We provide three deployment profiles based on your network situation:
-
-### Option 1: Caddy with Let's Encrypt (Recommended)
-
-**Best for:** Production deployments with a domain name
-
-**Prerequisites:**
-- Domain name pointing to your server
-- Ports 80 and 443 open in firewall
-- Public IP address
-
-**Setup:**
-1. Edit `.env` and set your domain:
-   ```env
-   DOMAIN=app.example.com
-   APP_URL=https://app.example.com
-   ```
-
-2. Start with Caddy profile:
-   ```bash
-   docker compose --profile caddy up -d
-   ```
-
-3. Verify HTTPS is working:
-   ```bash
-   curl https://yourdomain.com
-   ```
-
-**Features:**
-- Automatic SSL certificates from Let's Encrypt
-- Auto-renewal of certificates
-- HTTP to HTTPS redirect
-- WebSocket proxying for Zero sync
-
-### Option 2: Cloudflare Tunnel (No Open Ports)
-
-**Best for:** Deployments behind firewalls or without public IPs
-
-**Prerequisites:**
-- Cloudflare account (free tier works)
-- No open ports required!
-
-**Setup:**
-1. Create a Cloudflare Tunnel:
-   - Go to [Cloudflare Zero Trust Dashboard](https://one.dash.cloudflare.com/)
-   - Navigate to Networks → Tunnels
-   - Create a new tunnel and save the token
-
-2. Configure tunnel routing:
-   - Add public hostname for your domain
-   - Service: `http://app:3000`
-   - Add another route for Zero WebSocket:
-     - Path: `/zero/*`
-     - Service: `http://zero:8080`
-
-3. Edit `.env` and add your tunnel token:
-   ```env
-   TUNNEL_TOKEN=your-tunnel-token-here
-   ```
-
-4. Start with Cloudflare profile:
-   ```bash
-   docker compose --profile cloudflare up -d
-   ```
-
-**Features:**
-- No open ports needed
-- DDoS protection included
-- Works behind NAT/firewalls
-- Global CDN included
-
-### Option 3: Local HTTPS (Development/Testing)
-
-**Best for:** Local testing or internal networks
-
-**Prerequisites:**
-- None - works out of the box
-
-**Setup:**
-1. Start with local profile:
-   ```bash
-   docker compose --profile local up -d
-   ```
-
-2. Access at `https://localhost`
-
-3. Accept the self-signed certificate warning in your browser
-
-**Features:**
-- Self-signed certificates (browser warning expected)
-- No domain needed
-- Perfect for testing HTTPS features locally
-
-## Environment Variables
-
-Key environment variables in `.env`:
-
-```env
-# Database
-POSTGRES_PASSWORD=changeme      # Change in production!
-POSTGRES_DB=hoard
-POSTGRES_USER=postgres
-
-# Security (auto-generated by setup.sh)
-BETTER_AUTH_SECRET=<32-char-secret>
-JWT_SECRET=<32-char-secret>
-
-# Profile-specific
-DOMAIN=yourdomain.com           # For Caddy profile
-TUNNEL_TOKEN=<cloudflare-token> # For Cloudflare profile
-APP_URL=https://yourdomain.com  # Application URL
+# generate secrets
+openssl rand -hex 32          # -> JAZZ_ADMIN_SECRET
+openssl rand -hex 32          # -> BETTER_AUTH_SECRET
 ```
 
-## Common Commands
+Set `DOMAIN` (and `SYNC_DOMAIN` if you don't want `sync.<DOMAIN>`). Optional:
+`AI_PROVIDER`/`AI_MODEL` + the matching API key to enable capture enrichment.
 
-### View logs
-```bash
-# All services
-docker compose --profile <profile> logs -f
+Then:
 
-# Specific service
-docker compose --profile <profile> logs -f app
+```sh
+docker compose up -d --build
+docker compose ps          # wait for app + jazz to report healthy
 ```
 
-### Stop services
-```bash
-docker compose --profile <profile> down
+> `VITE_JAZZ_APP_ID` and `VITE_JAZZ_SERVER_URL` are **baked into the client
+> bundle at build time** (compose passes them as build args from
+> `JAZZ_APP_ID` / `SYNC_ORIGIN`). If you ever change the app id or the sync
+> domain, rerun `docker compose up -d --build`.
+
+## Publish schema + permissions (required before first use)
+
+The sync server starts empty — it rejects clients until your schema and
+permission policies are published. From the **repo root** (where `schema.ts`
+and `permissions.ts` live), pointing at the public sync origin:
+
+```sh
+JAZZ_SERVER_URL=https://sync.<DOMAIN> \
+JAZZ_ADMIN_SECRET=<value from deploy/.env> \
+npx jazz-tools@alpha deploy <JAZZ_APP_ID>
 ```
 
-### Restart services
-```bash
-docker compose --profile <profile> restart
+(`--server-url` / `--admin-secret` flags work too. Admin routes are plain
+HTTPS `POST /apps/<id>/admin/...`, so going through Caddy is fine.)
+
+Now open `https://<DOMAIN>`, sign up, and start hoarding.
+
+## Schema migrations (future schema changes)
+
+Jazz 2 versions data by schema hash; clients on older schemas keep working via
+published migrations ("lenses"). Workflow when you change `schema.ts`:
+
+```sh
+# one-time, before your first ever schema change: snapshot the current schema
+npx jazz-tools@alpha migrations create
+
+# ...edit schema.ts...
+
+npx jazz-tools@alpha migrations create --name my-change   # writes migrations/<...>.ts stub
+# review the generated migration (defaults for new columns, ambiguous renames)
+
+npx jazz-tools@alpha validate                             # optional pre-flight
+
+JAZZ_SERVER_URL=https://sync.<DOMAIN> JAZZ_ADMIN_SECRET=... \
+npx jazz-tools@alpha deploy <JAZZ_APP_ID>                 # schema + migration + permissions
 ```
 
-### Update and rebuild
-```bash
+Permission-only changes (`permissions.ts`) need no migration — just rerun the
+same `deploy` command. Then rebuild/redeploy the app image so shipped clients
+match: `docker compose up -d --build app`.
+
+## Backups
+
+All state lives in two named volumes (plus TLS certs):
+
+- `hoard_auth-data` — Better Auth sqlite (`/data/auth.db`): users, sessions,
+  JWKS signing keys.
+- `hoard_jazz-data` — the entire inventory: every row and photo blob synced
+  through Jazz.
+
+Example cold-ish backup (sqlite is snapshot-safe enough for a home app when
+briefly stopped; jazz data prefers a stopped server for consistency):
+
+```sh
+docker compose stop app jazz
+docker run --rm -v hoard_auth-data:/a -v hoard_jazz-data:/j -v "$PWD":/out alpine \
+  tar czf /out/hoard-backup-$(date +%F).tar.gz -C / a j
+docker compose start app jazz
+```
+
+Restore by untarring into fresh volumes before `up`. `caddy-data` is
+re-provisionable (certificates get reissued) but backing it up avoids
+Let's Encrypt rate-limit surprises.
+
+## Updating
+
+```sh
 git pull
-docker compose --profile <profile> build
-docker compose --profile <profile> up -d
+cd deploy
+docker compose build --pull
+docker compose up -d
+# if schema.ts / permissions.ts changed: run the deploy command above first
 ```
 
-### Database backup
-```bash
-docker compose exec postgres pg_dump -U postgres hoard > backup.sql
+Pinned versions to keep in sync when bumping dependencies:
+
+- `Dockerfile.jazz` pins `jazz-tools@2.0.0-alpha.53` — match `package.json`.
+- `Dockerfile.app` pins `@better-auth/cli@1.4.21` — keep compatible with the
+  `better-auth` version in `package.json`.
+
+## Local smoke test (no TLS, no real domain)
+
+`docker-compose.local.yml` publishes Caddy on `localhost:8080` (plain HTTP)
+and exposes app/jazz directly on `localhost:3210`/`localhost:4210`:
+
+```sh
+cd deploy
+cp .env.example .env   # set DOMAIN=http://localhost, SYNC_DOMAIN=http://sync.localhost,
+                       # APP_ORIGIN=http://localhost:8080, SYNC_ORIGIN=ws://localhost:4210,
+                       # plus JAZZ_APP_ID and both secrets
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+
+curl -s localhost:3210/login | head -c 200          # app serves the SPA
+curl -s localhost:4210/health                        # jazz health endpoint
+curl -s localhost:8080/login -H 'Host: localhost' | head -c 200   # via caddy
+
+# publish schema straight to the exposed jazz port (from repo root)
+JAZZ_SERVER_URL=http://localhost:4210 JAZZ_ADMIN_SECRET=... \
+npx jazz-tools deploy <JAZZ_APP_ID>
+
+docker compose -f docker-compose.yml -f docker-compose.local.yml down -v
 ```
-
-### Database restore
-```bash
-docker compose exec -T postgres psql -U postgres hoard < backup.sql
-```
-
-## Customization
-
-### Override Settings
-
-Create `docker-compose.override.yml` from the example:
-```bash
-cp docker-compose.override.yml.example docker-compose.override.yml
-```
-
-Edit to add custom configurations without modifying the main compose file.
-
-### Custom Domain with Cloudflare
-
-If using Cloudflare Tunnel with a custom domain:
-1. Add CNAME record pointing to your tunnel subdomain
-2. Configure the tunnel's public hostname in Zero Trust dashboard
-3. Update `APP_URL` in `.env`
-
-## Troubleshooting
-
-### Port 80/443 Already in Use
-
-If you see "bind: address already in use":
-```bash
-# Check what's using the ports
-sudo lsof -i :80
-sudo lsof -i :443
-
-# Stop conflicting services or change ports in docker-compose.yml
-```
-
-### Let's Encrypt Rate Limits
-
-If certificate generation fails:
-- Let's Encrypt has rate limits (50 certificates per domain per week)
-- Use the `local` profile for testing
-- Wait if you've hit the limit
-
-### Certificate Warnings (Local Profile)
-
-This is expected with self-signed certificates:
-1. Click "Advanced" in browser
-2. Click "Proceed to localhost (unsafe)"
-3. The warning only appears once per browser
-
-### WebSocket Connection Issues
-
-If Zero sync isn't working:
-1. Check browser console for WebSocket errors
-2. Ensure `/zero/*` routes are properly configured
-3. Verify `NEXT_PUBLIC_ZERO_SERVER` environment variable
-4. Check Zero server logs: `docker compose logs zero`
-
-### Database Connection Issues
-
-```bash
-# Check if PostgreSQL is running
-docker compose ps postgres
-
-# Test connection
-docker compose exec postgres psql -U postgres -d hoard -c "SELECT 1"
-
-# Check logs
-docker compose logs postgres
-```
-
-### Permission Issues with Uploads
-
-```bash
-# Fix upload directory permissions
-docker compose exec app chown -R nextjs:nodejs /app/uploads
-```
-
-## Security Considerations
-
-1. **Change default passwords** in `.env` before deploying
-2. **Use strong secrets** - the setup script generates these automatically
-3. **Keep software updated** - regularly pull and rebuild images
-4. **Backup your data** - especially the PostgreSQL volume
-5. **Monitor logs** for suspicious activity
-6. **Use firewall rules** to restrict access if needed
-
-## Performance Tuning
-
-### PostgreSQL Optimization
-
-Add to `docker-compose.override.yml`:
-```yaml
-services:
-  postgres:
-    command:
-      - postgres
-      - -c
-      - wal_level=logical
-      - -c
-      - max_connections=200
-      - -c
-      - shared_buffers=256MB
-```
-
-### Resource Limits
-
-Add to `docker-compose.override.yml`:
-```yaml
-services:
-  app:
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-```
-
-## Monitoring
-
-### Health Checks
-
-The deployment includes health checks for critical services:
-- PostgreSQL: Connection availability
-- App & Zero: Add custom health endpoints
-
-### Logs
-
-Configure log rotation in `docker-compose.override.yml`:
-```yaml
-services:
-  app:
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-```
-
-## Support
-
-For issues or questions:
-1. Check the logs first: `docker compose logs`
-2. Review this troubleshooting guide
-3. Check GitHub issues
-4. Create a new issue with:
-   - Deployment profile used
-   - Error messages from logs
-   - Environment details (OS, Docker version)
-
-## License
-
-See main repository LICENSE file.

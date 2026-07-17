@@ -1,46 +1,23 @@
-# Ignore local environment files
-.env
-.env.local
-.env.production
-.env.development
-.env.*
-
-# Ignore node_modules as we'll install fresh
+# Keep the image build context clean and deterministic.
 node_modules
-
-# Ignore git files
+dist
+dist-ssr
+.output
+.nitro
+.vinxi
+.tanstack
+.wrangler
+data
 .git
-.gitignore
-
-# Ignore Next.js build output
-.next
-out
-
-# Ignore development files
 .vscode
-.idea
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+*.local
 
-# Ignore OS files
-.DS_Store
-Thumbs.db
-
-# Ignore test files
-coverage
-.nyc_output
-
-# Ignore local uploads
-uploads
-
-# Ignore local database files
-*.db
-*.sqlite
-sync-db
-
-# Ignore compose files from root
-compose.yaml
-docker-compose.yml
-docker-compose.*.yml
+# Never bake local env files into images — configuration comes from build args
+# and container environment (deploy/.env).
+.env
+.env.*
+!.env.example
+deploy/.env
+deploy/.env.*
+!deploy/.env.example

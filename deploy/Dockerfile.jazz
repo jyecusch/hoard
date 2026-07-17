@@ -1,0 +1,29 @@
+# Jazz 2 sync server. Runs `jazz-tools server` against a persistent /data dir.
+#
+# Auth model: external JWTs only. The server validates `Authorization: Bearer`
+# tokens against JAZZ_JWKS_URL (Better Auth's JWKS in the app container);
+# local-first self-signed Jazz JWTs are disabled because NODE_ENV=production
+# and --allow-local-first-auth is not passed.
+#
+# Configuration comes from environment variables read natively by the CLI:
+#   JAZZ_JWKS_URL, JAZZ_ADMIN_SECRET (see docker-compose.yml)
+FROM node:22-bookworm-slim
+WORKDIR /srv
+
+ENV NODE_ENV=production
+
+# Pin to the jazz-tools version in package.json (jazz-napi native prebuild is
+# pulled automatically; jazz-wasm is the fallback).
+RUN npm install jazz-tools@2.0.0-alpha.53
+
+# Schema + permissions are baked in so the same image can publish them to the
+# running server (the compose file's one-shot `publish` service):
+#   cd /srv/schema && jazz-tools deploy $JAZZ_APP_ID
+# NOTE: build context must be the repo root (dockerfile: deploy/Dockerfile.jazz).
+COPY schema.ts permissions.ts /srv/schema/
+
+VOLUME /data
+EXPOSE 4200
+
+# Shell form so $JAZZ_APP_ID (required positional arg) expands at start.
+CMD ["/bin/sh", "-c", "exec ./node_modules/.bin/jazz-tools server \"$JAZZ_APP_ID\" --port 4200 --data-dir /data"]
