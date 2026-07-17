@@ -1,0 +1,189 @@
+/*
+ * Hoard — "workshop ledger" theme.
+ *
+ * Warm paper surfaces, umber ink, one accent: safety orange — the color of
+ * tape measures and torque wrenches. Hairline borders instead of drop
+ * shadows; Bricolage Grotesque for headings, Schibsted Grotesk for UI text,
+ * Spline Sans Mono strictly for label codes.
+ */
+@import '@fontsource-variable/bricolage-grotesque';
+@import '@fontsource-variable/schibsted-grotesk';
+@import '@fontsource-variable/spline-sans-mono';
+@import 'tailwindcss';
+@plugin '@tailwindcss/typography';
+
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* paper + ink */
+  --background: oklch(0.972 0.007 84);
+  --foreground: oklch(0.27 0.018 55);
+  --card: oklch(0.988 0.005 88);
+  --card-foreground: oklch(0.27 0.018 55);
+  --popover: oklch(0.988 0.005 88);
+  --popover-foreground: oklch(0.27 0.018 55);
+  /* safety orange */
+  --primary: oklch(0.585 0.175 41);
+  --primary-foreground: oklch(0.985 0.006 85);
+  --secondary: oklch(0.937 0.01 84);
+  --secondary-foreground: oklch(0.32 0.02 55);
+  --muted: oklch(0.945 0.008 84);
+  --muted-foreground: oklch(0.49 0.02 60);
+  --accent: oklch(0.937 0.012 78);
+  --accent-foreground: oklch(0.27 0.018 55);
+  --destructive: oklch(0.54 0.19 27);
+  --destructive-foreground: oklch(0.985 0.006 85);
+  --border: oklch(0.885 0.012 80);
+  --input: oklch(0.865 0.013 80);
+  --ring: oklch(0.585 0.175 41);
+  --chart-1: oklch(0.585 0.175 41);
+  --chart-2: oklch(0.55 0.09 145);
+  --chart-3: oklch(0.5 0.1 260);
+  --chart-4: oklch(0.7 0.13 85);
+  --chart-5: oklch(0.55 0.12 350);
+  --radius: 0.375rem;
+  --sidebar: oklch(0.955 0.009 84);
+  --sidebar-foreground: oklch(0.27 0.018 55);
+  --sidebar-primary: oklch(0.585 0.175 41);
+  --sidebar-primary-foreground: oklch(0.985 0.006 85);
+  --sidebar-accent: oklch(0.92 0.012 80);
+  --sidebar-accent-foreground: oklch(0.27 0.018 55);
+  --sidebar-border: oklch(0.885 0.012 80);
+  --sidebar-ring: oklch(0.585 0.175 41);
+}
+
+.dark {
+  /* workshop at night: warm charcoal + amber orange */
+  --background: oklch(0.205 0.012 55);
+  --foreground: oklch(0.93 0.012 85);
+  --card: oklch(0.24 0.013 55);
+  --card-foreground: oklch(0.93 0.012 85);
+  --popover: oklch(0.24 0.013 55);
+  --popover-foreground: oklch(0.93 0.012 85);
+  --primary: oklch(0.70 0.16 45);
+  --primary-foreground: oklch(0.17 0.02 50);
+  --secondary: oklch(0.29 0.014 55);
+  --secondary-foreground: oklch(0.93 0.012 85);
+  --muted: oklch(0.275 0.013 55);
+  --muted-foreground: oklch(0.68 0.016 70);
+  --accent: oklch(0.30 0.016 55);
+  --accent-foreground: oklch(0.93 0.012 85);
+  --destructive: oklch(0.62 0.19 25);
+  --destructive-foreground: oklch(0.95 0.01 85);
+  --border: oklch(0.325 0.014 55);
+  --input: oklch(0.35 0.015 55);
+  --ring: oklch(0.70 0.16 45);
+  --chart-1: oklch(0.70 0.16 45);
+  --chart-2: oklch(0.65 0.1 145);
+  --chart-3: oklch(0.62 0.11 260);
+  --chart-4: oklch(0.78 0.13 85);
+  --chart-5: oklch(0.65 0.13 350);
+  --sidebar: oklch(0.185 0.012 55);
+  --sidebar-foreground: oklch(0.93 0.012 85);
+  --sidebar-primary: oklch(0.70 0.16 45);
+  --sidebar-primary-foreground: oklch(0.17 0.02 50);
+  --sidebar-accent: oklch(0.27 0.014 55);
+  --sidebar-accent-foreground: oklch(0.93 0.012 85);
+  --sidebar-border: oklch(0.30 0.014 55);
+  --sidebar-ring: oklch(0.70 0.16 45);
+}
+
+@theme inline {
+  --font-sans: 'Schibsted Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque Variable', 'Schibsted Grotesk Variable', sans-serif;
+  --font-mono: 'Spline Sans Mono Variable', ui-monospace, monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  /* hairline world: shadows are whispers, borders do the work */
+  --shadow-2xs: 0 1px 2px oklch(0.27 0.018 55 / 0.04);
+  --shadow-xs: 0 1px 2px oklch(0.27 0.018 55 / 0.05);
+  --shadow-sm: 0 1px 3px oklch(0.27 0.018 55 / 0.06);
+  --shadow-md: 0 2px 8px oklch(0.27 0.018 55 / 0.07);
+  --shadow-lg: 0 8px 24px oklch(0.27 0.018 55 / 0.09);
+  --shadow-xl: 0 12px 32px oklch(0.27 0.018 55 / 0.1);
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  /* Headings carry the brand voice */
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-variation-settings: 'opsz' 24;
+    letter-spacing: -0.015em;
+  }
+
+  ::selection {
+    background: color-mix(in oklch, var(--primary) 22%, transparent);
+  }
+
+  code {
+    font-family: var(--font-mono);
+  }
+}
+
+/* Section label: small caps ledger heading, e.g. "LENT OUT — 3" */
+.ledger-label {
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
